@@ -1,0 +1,19 @@
+{
+    "name": "Azathrix.EzUI.Editor",
+    "rootNamespace": "Azathrix.EzUI",
+    "references": [
+        "Azathrix.EzUI",
+        "Azathrix.GameKit.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

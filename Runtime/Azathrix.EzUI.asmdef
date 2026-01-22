@@ -1,0 +1,20 @@
+﻿{
+    "name": "Azathrix.EzUI",
+    "rootNamespace": "Azathrix.EzUI",
+    "references": [
+        "Azathrix.Framework.Runtime",
+        "Azathrix.GameKit.Runtime",
+        "UniTask",
+        "UnityEngine.UI",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
