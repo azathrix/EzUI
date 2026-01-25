@@ -1,7 +1,7 @@
 ﻿{
     "name": "com.azathrix.ezui",
     "displayName": "EzUI",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "unity": "6000.3",
     "description": "\u8fd9\u662f\u4e00\u4e2a\u7b80\u5355\u7684UI\u7cfb\u7edf.",
     "keywords": [
@@ -15,7 +15,7 @@
     },
     "dependencies": {
         "com.azathrix.framework": "0.0.8",
-        "com.azathrix.game-kit": "1.0.1",
+        "com.azathrix.game-kit": "1.0.4",
         "com.azathrix.unitask": "2.5.10"
     }
 }
