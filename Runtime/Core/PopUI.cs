@@ -36,47 +36,41 @@ namespace Azathrix.EzUI.Core
         protected virtual bool autoPauseGame => true;
 
         /// <summary>
+        /// 输入方案（为空则不切换）
+        /// </summary>
+        protected virtual string inputScheme =>
+            EzUISettings.Instance?.defaultPopUIInputScheme ?? "UI";
+
+        /// <summary>
         /// 是否可以自动关闭,右键 ECS会进行自动关闭
         /// </summary>
         public virtual AutoCloseTopTypeEnum autoCloseTopType => AutoCloseTopTypeEnum.Hide;
 
         protected virtual bool useUIEvent { get; } = true;
 
-        protected override void OnCreate()
-        {
-            base.OnCreate();
-            var btn = transform.Find("CloseBtn");
-            if (btn)
-            {
-                btn.GetComponent<Button>().onClick.AddListener(() =>
-                {
-                    // TODO: 可在此触发关闭逻辑
-                });
-            }
-        }
 
         protected override void OnShow()
         {
             base.OnShow();
-            // TODO: 输入系统切换（按宏扩展）
+            if (!string.IsNullOrWhiteSpace(inputScheme))
+                UISystem?.SetInputScheme(this, inputScheme);
         }
 
         protected override void OnHide()
         {
             base.OnHide();
-            // TODO: 输入系统切换（按宏扩展）
+            if (!string.IsNullOrWhiteSpace(inputScheme))
+                UISystem?.SetInputScheme(this, null);
         }
 
         protected override void OnScriptActivate()
         {
             base.OnScriptActivate();
-            // TODO: 输入系统切换（按宏扩展）
         }
 
         protected override void OnScriptDeactivate()
         {
             base.OnScriptDeactivate();
-            // TODO: 输入系统切换（按宏扩展）
         }
 
         public virtual void OnMaskClick()

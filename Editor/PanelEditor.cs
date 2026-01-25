@@ -1,26 +1,27 @@
 using Azathrix.EzUI.Animations;
 using Azathrix.EzUI.Core;
+using Azathrix.GameKit.Editor;
 using UnityEditor;
-using UnityEngine;
 
 namespace Azathrix.EzUI.Editor
 {
     [CustomEditor(typeof(Panel), true)]
-    public class PanelEditor : UnityEditor.Editor
+    public class PanelEditor : GameScriptEditor
     {
         public override void OnInspectorGUI()
         {
+            base.OnInspectorGUI();
+            
             serializedObject.Update();
-
-            DrawPropertiesExcluding(serializedObject, "_animation");
 
             var animationProp = serializedObject.FindProperty("_animation");
             var panel = target as Panel;
             if (panel == null)
             {
                 serializedObject.ApplyModifiedProperties();
-                return;
+                return; 
             }
+
             var current = animationProp.objectReferenceValue as UIAnimationComponent;
             if (current == null)
             {
@@ -31,7 +32,8 @@ namespace Azathrix.EzUI.Editor
 
             var types = UIAnimationEditorUtility.GetAnimationTypes();
             var names = UIAnimationEditorUtility.BuildTypeDisplayNames(types);
-            var currentIndex = UIAnimationEditorUtility.FindTypeIndex(types, current != null ? current.GetType() : null);
+            var currentIndex =
+                UIAnimationEditorUtility.FindTypeIndex(types, current != null ? current.GetType() : null);
 
             var newIndex = EditorGUILayout.Popup("Animation Component", currentIndex, names);
             if (newIndex != currentIndex)
@@ -42,6 +44,7 @@ namespace Azathrix.EzUI.Editor
                     {
                         Undo.DestroyObjectImmediate(current);
                     }
+
                     animationProp.objectReferenceValue = null;
                 }
                 else

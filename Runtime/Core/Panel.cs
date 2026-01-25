@@ -6,8 +6,11 @@ using Azathrix.Framework.Core.Attributes;
 using Azathrix.Framework.Tools;
 using Azathrix.GameKit.Runtime.Behaviours;
 using Cysharp.Threading.Tasks;
-using Sirenix.OdinInspector;
 using UnityEngine;
+
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#endif
 
 namespace Azathrix.EzUI.Core
 {
@@ -19,20 +22,29 @@ namespace Azathrix.EzUI.Core
         [Inject]
         public UISystem UISystem { set; get; }
 
+
 #if ODIN_INSPECTOR
         [LabelText("层级")]
 #endif
-        [SerializeField] private int _layer = 10;
+        [SerializeField]
+        private int _layer = 10;
 
 #if ODIN_INSPECTOR
-        [LabelText("动画组件")]
+        [LabelText("使用遮罩")]
 #endif
-        [SerializeField] private UIAnimationComponent _animation;
+        [SerializeField]
+        private bool _useMask = true;
+        
+#if ODIN_INSPECTOR
+        [LabelText("动画")]
+#endif
+        [SerializeField]
+        private UIAnimationComponent _animation;
 
         /// <summary>
         /// 使用Mask
         /// </summary>
-        public virtual bool useMask => true;
+        public virtual bool useMask => _useMask;
 
         /// <summary>
         /// 当前Panel的路径,创建后初始化赋予
@@ -84,7 +96,7 @@ namespace Azathrix.EzUI.Core
             }
         }
 
-        private StateEnum _state = StateEnum.Hidden;
+        private PanelStateMachine _stateMachine;
 
         [Flags]
         public enum StateEnum
@@ -99,18 +111,14 @@ namespace Azathrix.EzUI.Core
 
         protected void SetState(StateEnum state)
         {
-            if (_state != state)
-            {
-                var last = _state;
-                _state = state;
-                OnStateChanged(last, state);
-                UISystem?.NotifyPanelStateChanged(this, last, state);
-            }
+            EnsureStateMachine();
+            _stateMachine.TryTransition(state);
         }
 
         public bool IsState(StateEnum state)
         {
-            return (_state & state) > 0;
+            EnsureStateMachine();
+            return (_stateMachine.State & state) > 0;
         }
 
         protected virtual void OnStateChanged(StateEnum last, StateEnum cur)
@@ -181,6 +189,7 @@ namespace Azathrix.EzUI.Core
                     {
                         Debug.LogException(e);
                     }
+
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(cur), cur, null);
@@ -272,17 +281,15 @@ namespace Azathrix.EzUI.Core
             if (!useAnimation)
             {
                 SetState(StateEnum.Hide);
-                OnHide();
                 gameObject.SetActive(false);
                 SetState(StateEnum.Hidden);
-                OnHidden();
                 SetState(StateEnum.Close);
                 UISystem?.RefreshUI();
                 UISystem?.Destroy(this);
                 return;
             }
 
-            if (!IsState(StateEnum.Hidden | StateEnum.Shown | StateEnum.Close))
+            if (IsState(StateEnum.Close))
                 return;
 
             SetState(StateEnum.Hide);
@@ -371,6 +378,57 @@ namespace Azathrix.EzUI.Core
             _views.Add(view);
         }
 
+        private void EnsureStateMachine()
+        {
+            _stateMachine ??= new PanelStateMachine(this);
+        }
+
+        private sealed class PanelStateMachine
+        {
+            private readonly Panel _owner;
+
+            public PanelStateMachine(Panel owner)
+            {
+                _owner = owner;
+                State = StateEnum.Hidden;
+            }
+
+            public StateEnum State { get; private set; }
+
+            public bool TryTransition(StateEnum next)
+            {
+                if (State == next)
+                    return false;
+
+                if (!IsValidTransition(State, next))
+                {
+                    Log.Warning($"[EzUI] Panel状态切换无效: {State} -> {next} ({_owner.GetType().Name})");
+                    return false;
+                }
+
+                var last = State;
+                State = next;
+                _owner.OnStateChanged(last, next);
+                _owner.UISystem?.NotifyPanelStateChanged(_owner, last, next);
+                return true;
+            }
+
+            private static bool IsValidTransition(StateEnum from, StateEnum to)
+            {
+                return (from, to) switch
+                {
+                    (StateEnum.Hidden, StateEnum.Show) => true,
+                    (StateEnum.Hidden, StateEnum.Hide) => true,
+                    (StateEnum.Hidden, StateEnum.Close) => true,
+                    (StateEnum.Show, StateEnum.Shown) => true,
+                    (StateEnum.Show, StateEnum.Hide) => true,
+                    (StateEnum.Shown, StateEnum.Hide) => true,
+                    (StateEnum.Hide, StateEnum.Hidden) => true,
+                    _ => false
+                };
+            }
+        }
+
         private void EnsureAnimationComponent()
         {
             if (_animation == null)
@@ -381,6 +439,5 @@ namespace Azathrix.EzUI.Core
                 AzathrixFramework.InjectTo(_animation);
             }
         }
-
     }
 }

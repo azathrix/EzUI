@@ -1,10 +1,8 @@
 {
-    "name": "Azathrix.EzUI.Editor",
-    "rootNamespace": "Azathrix.EzUI",
+    "name": "Azathrix.EzUI.Tests.Editor",
+    "rootNamespace": "Azathrix.EzUI.Tests",
     "references": [
-        "Azathrix.EzUI",
-        "Azathrix.GameKit.Runtime",
-        "Azathrix.GameKit.Editor"
+        "Azathrix.EzUI"
     ],
     "includePlatforms": [
         "Editor"

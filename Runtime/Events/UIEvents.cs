@@ -75,8 +75,16 @@ namespace Azathrix.EzUI.Events
 
     public struct UIMainUIChanged
     {
-        public MainUI previous;
-        public MainUI current;
+        public Panel previous;
+        public Panel current;
+    }
+
+    public struct UIInputSchemeChanged
+    {
+        public string previous;
+        public string current;
+        public int count;
+        public Panel source;
     }
 
     // ----- 事件化 API 请求 -----

@@ -1,14 +1,15 @@
 {
-    "name": "Azathrix.EzUI.Editor",
-    "rootNamespace": "Azathrix.EzUI",
+    "name": "Azathrix.EzUI.Tests",
+    "rootNamespace": "Azathrix.EzUI.Tests",
     "references": [
         "Azathrix.EzUI",
+        "Azathrix.Framework.Runtime",
         "Azathrix.GameKit.Runtime",
-        "Azathrix.GameKit.Editor"
+        "UniTask",
+        "UnityEngine.TestRunner",
+        "UnityEngine.UI"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
@@ -16,5 +17,6 @@
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
-    "noEngineReferences": false
+    "noEngineReferences": false,
+    "testAssemblies": true
 }

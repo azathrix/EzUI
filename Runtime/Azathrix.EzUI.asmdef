@@ -1,4 +1,4 @@
-﻿{
+{
     "name": "Azathrix.EzUI",
     "rootNamespace": "Azathrix.EzUI",
     "references": [
@@ -6,7 +6,8 @@
         "Azathrix.GameKit.Runtime",
         "UniTask",
         "UnityEngine.UI",
-        "Unity.RenderPipelines.Universal.Runtime"
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

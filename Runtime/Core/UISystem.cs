@@ -16,6 +16,10 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem.UI;
+#endif
 using Debug = UnityEngine.Debug;
 using Object = UnityEngine.Object;
 
@@ -24,8 +28,6 @@ namespace Azathrix.EzUI.Core
     [SystemAlias("UI系统")]
     public class UISystem : ISystem, ISystemInitialize, ISystemRegister
     {
-        private const string DefaultFolderFallback = "UI";
-
         /// <summary>
         /// UI根节点
         /// </summary>
@@ -59,7 +61,7 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 默认Mask
         /// </summary>
-        private Transform _mask;
+        private RectTransform _mask;
 
         private bool _maskActive;
         private Panel _maskTarget;
@@ -82,24 +84,34 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 当前MainUI
         /// </summary>
-        private MainUI _currentMainUI;
+        private Panel _currentMainUI;
 
         /// <summary>
         /// MainUI历史栈
         /// </summary>
-        private readonly Stack<MainUI> _mainUIHistory = new Stack<MainUI>();
+        private readonly Stack<Panel> _mainUIHistory = new Stack<Panel>();
+
+        /// <summary>
+        /// 输入方案栈（后入先出）
+        /// </summary>
+        private readonly List<(object owner, string scheme)> _inputSchemes = new List<(object, string)>();
 
         /// <summary>
         /// 获取当前MainUI
         /// </summary>
-        public MainUI CurrentMainUI => _currentMainUI;
+        public Panel CurrentMainUI => _currentMainUI;
+
+        /// <summary>
+        /// 当前输入方案
+        /// </summary>
+        public string CurrentInputScheme { get; private set; } = "Game";
 
         private readonly List<SubscriptionResult> _subscriptions = new List<SubscriptionResult>();
-
+        
         private EzUISettings Settings => EzUISettings.Instance;
 
-        private string DefaultResourcesFolder =>
-            string.IsNullOrWhiteSpace(Settings?.resourcesFolder) ? DefaultFolderFallback : Settings.resourcesFolder;
+        private string DefaultGameInputScheme =>
+            string.IsNullOrWhiteSpace(Settings?.defaultGameInputScheme) ? "Game" : Settings.defaultGameInputScheme;
 
         private string DefaultPanelPathFormat =>
             string.IsNullOrWhiteSpace(Settings?.panelPathFormat) ? "UI/{0}" : Settings.panelPathFormat;
@@ -160,6 +172,7 @@ namespace Azathrix.EzUI.Core
             trans.offsetMax = Vector2.zero;
             trans.offsetMin = Vector2.zero;
 
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.overrideSorting = true;
             canvas.sortingOrder = layer;
             canvas.worldCamera = _uiCamera;
@@ -206,13 +219,7 @@ namespace Azathrix.EzUI.Core
             GameObject go = new GameObject("Mask", typeof(Image), typeof(Button));
             go.layer = 5;
             RectTransform rt = (RectTransform) go.transform;
-            rt.SetParent(_uiRoot);
-            rt.anchorMax = Vector2.one;
-            rt.anchorMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-            rt.offsetMin = Vector2.zero;
-            rt.anchoredPosition3D = Vector3.zero;
-            rt.localScale = Vector3.one;
+            ConfigureMaskRect(rt, _uiRoot);
 
             var img = go.GetComponent<Image>();
             var btn = go.GetComponent<Button>();
@@ -236,6 +243,18 @@ namespace Azathrix.EzUI.Core
             go.SetActive(false);
         }
 
+        private static void ConfigureMaskRect(RectTransform rt, Transform parent)
+        {
+            rt.SetParent(parent, false);
+            rt.anchorMax = Vector2.one;
+            rt.anchorMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            rt.offsetMin = Vector2.zero;
+            rt.anchoredPosition3D = Vector3.zero;
+            rt.localRotation = Quaternion.identity;
+            rt.localScale = Vector3.one;
+        }
+
         public void RefreshUI()
         {
 #if UNITY_EDITOR
@@ -252,7 +271,7 @@ namespace Azathrix.EzUI.Core
             var prevMaskTarget = _maskTarget;
             _maskTarget = null;
 
-            _mask.SetParent(_uiRoot);
+            ConfigureMaskRect(_mask, _uiRoot);
             foreach (var ui in _instanceUIs)
             {
                 if (!ui.IsState(Panel.StateEnum.Shown | Panel.StateEnum.Show))
@@ -262,7 +281,7 @@ namespace Azathrix.EzUI.Core
                 {
                     Transform tr = ui.transform;
                     int index = tr.GetSiblingIndex();
-                    _mask.SetParent(tr.parent);
+                    ConfigureMaskRect(_mask, tr.parent);
                     _mask.SetSiblingIndex(index);
                     _mask.gameObject.SetActive(true);
                     maskFlag = true;
@@ -374,13 +393,13 @@ namespace Azathrix.EzUI.Core
             }
         }
 
-        public Panel LoadPersistenceUI(string name)
+        public Panel LoadPersistenceUI(string path)
         {
-            Panel panel = FindUI(name);
+            Panel panel = FindUI(path);
 
             if (panel == null)
             {
-                panel = Instantiate(name);
+                panel = Instantiate(path);
                 if (panel == null)
                     return null;
                 panel.gameObject.SetActive(false);
@@ -414,6 +433,59 @@ namespace Azathrix.EzUI.Core
                 return;
 
             _persistenceUI.Remove(panel);
+        }
+
+        /// <summary>
+        /// 设置输入方案（不依赖具体输入系统）
+        /// </summary>
+        public void SetInputScheme(object owner, string scheme)
+        {
+            if (owner == null) return;
+
+            for (int i = _inputSchemes.Count - 1; i >= 0; i--)
+            {
+                if (_inputSchemes[i].owner == owner)
+                    _inputSchemes.RemoveAt(i);
+            }
+
+            if (!string.IsNullOrWhiteSpace(scheme))
+                _inputSchemes.Add((owner, scheme));
+
+            var next = _inputSchemes.Count > 0 ? _inputSchemes[^1].scheme : DefaultGameInputScheme;
+            if (next == CurrentInputScheme)
+                return;
+
+            var prev = CurrentInputScheme;
+            CurrentInputScheme = next;
+
+            var mode = Settings?.inputSchemeSwitchMode ?? EzUISettings.InputSchemeSwitchMode.EventOnly;
+            if (mode == EzUISettings.InputSchemeSwitchMode.HandlerThenEvent)
+                TryApplyInputSchemeHandler(prev, next, owner);
+
+            if (mode != EzUISettings.InputSchemeSwitchMode.None)
+            {
+                Dispatch(new UIInputSchemeChanged
+                {
+                    previous = prev,
+                    current = next,
+                    count = _inputSchemes.Count,
+                    source = owner as Panel
+                });
+            }
+        }
+
+        private void TryApplyInputSchemeHandler(string previous, string current, object source)
+        {
+            var handlerObj = Settings?.inputSchemeHandler;
+            if (handlerObj == null) return;
+
+            if (handlerObj is IEzUIInputSchemeHandler handler)
+            {
+                handler.ApplyInputScheme(previous, current, source);
+                return;
+            }
+
+            Log.Warning("[EzUI] inputSchemeHandler 未实现 IEzUIInputSchemeHandler");
         }
 
         public void DestroyAll(bool force = false)
@@ -451,6 +523,7 @@ namespace Azathrix.EzUI.Core
                 });
 
                 Object.Destroy(ui.gameObject);
+                SetInputScheme(ui, null);
             }
 
             RefreshUI();
@@ -528,6 +601,24 @@ namespace Azathrix.EzUI.Core
             return string.Format(DefaultPanelPathFormat, t.Name);
         }
 
+        private bool IsMainUIPath(string path)
+        {
+            var prefab = LoadUI(path);
+            if (prefab == null)
+            {
+                Log.Warning($"[EzUI] 未找到UI预设: {path}");
+                return false;
+            }
+
+            if (prefab is not IMainUI)
+            {
+                Log.Warning($"[EzUI] {prefab.GetType().Name} 未实现 IMainUI，无法作为主UI");
+                return false;
+            }
+
+            return true;
+        }
+
         private string ResolvePath(string path, Type panelType)
         {
             if (!string.IsNullOrWhiteSpace(path))
@@ -563,6 +654,7 @@ namespace Azathrix.EzUI.Core
 
             _instanceUIs.Remove(ui);
             _persistenceUI.Remove(ui);
+            SetInputScheme(ui, null);
 
             Dispatch(new UIPanelDestroyed
             {
@@ -622,25 +714,9 @@ namespace Azathrix.EzUI.Core
             return p;
         }
 
-        public void LoadUI()
-        {
-            Log.Separator("加载UI");
-            var tw = new Stopwatch();
-            var ui = Resources.LoadAll<GameObject>(DefaultResourcesFolder);
-            foreach (var variable in ui)
-            {
-                if (variable.TryGetComponent<Panel>(out var panel))
-                {
-                    _loadedUI.Add(variable.name, panel);
-                    Log.Info("加载UI: " + variable.name);
-                }
-            }
-
-            Log.Info($"耗时:{tw.Elapsed.TotalSeconds}s");
-        }
-
         public UniTask OnInitializeAsync()
         {
+            CurrentInputScheme = DefaultGameInputScheme;
             InitFromPrefab();
             InitMask();
             return UniTask.CompletedTask;
@@ -654,18 +730,70 @@ namespace Azathrix.EzUI.Core
             var prefab = AzathrixFramework.ResourcesLoader.Load<GameObject>(DefaultUIRootPath);
             if (prefab == null)
             {
+                if (Settings?.autoCreateUIRoot ?? false)
+                {
+                    CreateDefaultUIRoot();
+                    return;
+                }
+
                 Log.Error("UIRoot 预设未找到: " + DefaultUIRootPath);
                 return;
             }
 
             var rootGo = Object.Instantiate(prefab);
-            rootGo.name = "[UIRoot]";
+            rootGo.name = Settings?.autoCreatedUIRootName ?? "[UIRoot]";
             Object.DontDestroyOnLoad(rootGo);
             _uiRoot = rootGo.transform;
             _uiCamera = rootGo.GetComponentInChildren<Camera>();
 
             // URP: 将 UI Camera 添加到主摄像机堆叠
             SetupURPCameraStack();
+
+            Dispatch(new UIRootCreated
+            {
+                root = _uiRoot,
+                uiCamera = _uiCamera
+            });
+        }
+
+        private void CreateDefaultUIRoot()
+        {
+            var rootName = Settings?.autoCreatedUIRootName ?? "[UIRoot]";
+            var rootGo = new GameObject(rootName);
+            Object.DontDestroyOnLoad(rootGo);
+            _uiRoot = rootGo.transform;
+
+            if (Settings?.autoCreateUICamera ?? true)
+            {
+                var camGo = new GameObject("UICamera");
+                camGo.transform.SetParent(_uiRoot);
+                camGo.transform.localPosition = Vector3.zero;
+                camGo.transform.localRotation = Quaternion.identity;
+                camGo.transform.localScale = Vector3.one;
+                camGo.layer = 5;
+
+                var cam = camGo.AddComponent<Camera>();
+                cam.clearFlags = CameraClearFlags.Depth;
+                cam.orthographic = true;
+                cam.cullingMask = 1 << 5;
+                _uiCamera = cam;
+                SetupURPCameraStack();
+            }
+
+            if (Settings?.autoCreateEventSystem ?? true)
+            {
+                if (Object.FindObjectOfType<EventSystem>() == null)
+                {
+                    var esGo = new GameObject("EventSystem");
+                    esGo.transform.SetParent(_uiRoot);
+                    esGo.AddComponent<EventSystem>();
+#if ENABLE_INPUT_SYSTEM
+                    esGo.AddComponent<InputSystemUIInputModule>();
+#else
+                    Log.Warning("[EzUI] 新输入系统未启用，EventSystem 未添加输入模块");
+#endif
+                }
+            }
 
             Dispatch(new UIRootCreated
             {
@@ -683,6 +811,10 @@ namespace Azathrix.EzUI.Core
 
             var mainCamera = Camera.main;
             if (mainCamera == null) return;
+
+            var uiCameraData = _uiCamera.GetUniversalAdditionalCameraData();
+            if (uiCameraData != null)
+                uiCameraData.renderType = CameraRenderType.Overlay;
 
             var mainCameraData = mainCamera.GetUniversalAdditionalCameraData();
             if (mainCameraData != null && !mainCameraData.cameraStack.Contains(_uiCamera))
@@ -775,6 +907,7 @@ namespace Azathrix.EzUI.Core
 
         public void AutoCloseTopPopUI(bool useAnimation = true)
         {
+            SortUI();
             for (int i = 0; i < _instanceUIs.Count; i++)
             {
                 var ui = _instanceUIs[i];
@@ -803,14 +936,27 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 显示MainUI（保留历史栈）
         /// </summary>
-        public T ShowMainUI<T>(bool useAnimation = true, object userData = null) where T : MainUI
+        public T ShowMainUI<T>(bool useAnimation = true, object userData = null) where T : Panel, IMainUI
         {
             return ShowMainUI(GetPath(typeof(T)), useAnimation, userData) as T;
         }
 
-        public MainUI ShowMainUI(string path, bool useAnimation = true, object userData = null)
+        public Panel ShowMainUI(string path, bool useAnimation = true, object userData = null)
         {
-            var newMain = Show(path, useAnimation, userData) as MainUI;
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
+            var existing = FindUI(path);
+            if (existing != null && existing is not IMainUI)
+            {
+                Log.Warning($"[EzUI] {existing.GetType().Name} 未实现 IMainUI，无法作为主UI");
+                return null;
+            }
+
+            if (existing == null && !IsMainUIPath(path))
+                return null;
+
+            var newMain = Show(path, useAnimation, userData);
             if (newMain != null && newMain != _currentMainUI)
             {
                 var oldMain = _currentMainUI;
@@ -833,15 +979,28 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 切换MainUI（关闭旧的MainUI）
         /// </summary>
-        public T SwitchMainUI<T>(bool useAnimation = true, object userData = null) where T : MainUI
+        public T SwitchMainUI<T>(bool useAnimation = true, object userData = null) where T : Panel, IMainUI
         {
             return SwitchMainUI(GetPath(typeof(T)), useAnimation, userData) as T;
         }
 
-        public MainUI SwitchMainUI(string path, bool useAnimation = true, object userData = null)
+        public Panel SwitchMainUI(string path, bool useAnimation = true, object userData = null)
         {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
             var oldMain = _currentMainUI;
-            var newMain = Show(path, useAnimation, userData) as MainUI;
+            var existing = FindUI(path);
+            if (existing != null && existing is not IMainUI)
+            {
+                Log.Warning($"[EzUI] {existing.GetType().Name} 未实现 IMainUI，无法作为主UI");
+                return null;
+            }
+
+            if (existing == null && !IsMainUIPath(path))
+                return null;
+
+            var newMain = Show(path, useAnimation, userData);
 
             if (newMain != null && newMain != oldMain)
             {
@@ -864,7 +1023,7 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 返回上一个MainUI
         /// </summary>
-        public MainUI GoBackMainUI(bool useAnimation = true)
+        public Panel GoBackMainUI(bool useAnimation = true)
         {
             if (_mainUIHistory.Count == 0)
                 return null;
@@ -901,7 +1060,7 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 通知MainUI切换，处理附加UI
         /// </summary>
-        private void NotifyMainUIChange(MainUI oldMain, MainUI newMain)
+        private void NotifyMainUIChange(Panel oldMain, Panel newMain)
         {
             if (oldMain == newMain)
                 return;
@@ -910,7 +1069,7 @@ namespace Azathrix.EzUI.Core
             foreach (var ui in uisToProcess)
             {
                 // 跳过MainUI本身
-                if (ui is MainUI)
+                if (ui is IMainUI)
                     continue;
 
                 // 跳过持久化UI
@@ -967,6 +1126,16 @@ namespace Azathrix.EzUI.Core
                     break;
                 case Panel.StateEnum.Close:
                     Dispatch(new UIPanelClose {panel = panel, path = panel.path});
+                    if (panel == _currentMainUI)
+                    {
+                        var oldMain = _currentMainUI;
+                        _currentMainUI = null;
+                        Dispatch(new UIMainUIChanged
+                        {
+                            previous = oldMain,
+                            current = null
+                        });
+                    }
                     break;
             }
         }
