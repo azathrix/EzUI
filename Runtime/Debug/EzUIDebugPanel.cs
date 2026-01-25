@@ -7,6 +7,9 @@ using Azathrix.EzUI.Interfaces;
 using Azathrix.Framework.Core;
 using Azathrix.Framework.Events.Results;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Azathrix.EzUI.DebugTools
 {
@@ -46,12 +49,48 @@ namespace Azathrix.EzUI.DebugTools
 
         private void Update()
         {
+#if ENABLE_LEGACY_INPUT_MANAGER
             if (toggleKey != KeyCode.None && Input.GetKeyDown(toggleKey))
                 showWindow = !showWindow;
+#elif ENABLE_INPUT_SYSTEM
+            if (toggleKey != KeyCode.None && IsKeyPressed(Keyboard.current, toggleKey))
+                showWindow = !showWindow;
+#endif
 
             if (_uiSystem == null)
                 _uiSystem = AzathrixFramework.EffectiveRuntimeManager?.GetSystem<UISystem>();
         }
+
+#if ENABLE_INPUT_SYSTEM
+        private static bool IsKeyPressed(Keyboard keyboard, KeyCode keyCode)
+        {
+            if (keyboard == null)
+                return false;
+
+            switch (keyCode)
+            {
+                case KeyCode.F1: return keyboard.f1Key.wasPressedThisFrame;
+                case KeyCode.F2: return keyboard.f2Key.wasPressedThisFrame;
+                case KeyCode.F3: return keyboard.f3Key.wasPressedThisFrame;
+                case KeyCode.F4: return keyboard.f4Key.wasPressedThisFrame;
+                case KeyCode.F5: return keyboard.f5Key.wasPressedThisFrame;
+                case KeyCode.F6: return keyboard.f6Key.wasPressedThisFrame;
+                case KeyCode.F7: return keyboard.f7Key.wasPressedThisFrame;
+                case KeyCode.F8: return keyboard.f8Key.wasPressedThisFrame;
+                case KeyCode.F9: return keyboard.f9Key.wasPressedThisFrame;
+                case KeyCode.F10: return keyboard.f10Key.wasPressedThisFrame;
+                case KeyCode.F11: return keyboard.f11Key.wasPressedThisFrame;
+                case KeyCode.F12: return keyboard.f12Key.wasPressedThisFrame;
+                case KeyCode.Escape: return keyboard.escapeKey.wasPressedThisFrame;
+                case KeyCode.Tab: return keyboard.tabKey.wasPressedThisFrame;
+                case KeyCode.Space: return keyboard.spaceKey.wasPressedThisFrame;
+                case KeyCode.Return: return keyboard.enterKey.wasPressedThisFrame;
+                case KeyCode.KeypadEnter: return keyboard.numpadEnterKey.wasPressedThisFrame;
+                case KeyCode.BackQuote: return keyboard.backquoteKey.wasPressedThisFrame;
+                default: return false;
+            }
+        }
+#endif
 
         private void SubscribeEvents()
         {

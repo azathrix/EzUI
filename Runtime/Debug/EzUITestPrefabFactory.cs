@@ -35,7 +35,7 @@ namespace Azathrix.EzUI.DebugTools
             text.text = name;
             text.color = Color.white;
             text.fontSize = 36;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             go.AddComponent<T>();
             return go;

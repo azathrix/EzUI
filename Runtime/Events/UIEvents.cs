@@ -145,11 +145,6 @@ namespace Azathrix.EzUI.Events
         public object userData;
     }
 
-    public struct UIGoBackMainRequest
-    {
-        public bool useAnimation;
-    }
-
     public struct UILoadPersistenceRequest
     {
         public string path;

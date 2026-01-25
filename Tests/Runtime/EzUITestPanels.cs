@@ -17,5 +17,6 @@ namespace Azathrix.EzUI.Tests
 
     public class TestPopUI : PopUI
     {
+        protected override string inputScheme => "UI";
     }
 }

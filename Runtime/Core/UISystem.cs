@@ -87,11 +87,6 @@ namespace Azathrix.EzUI.Core
         private Panel _currentMainUI;
 
         /// <summary>
-        /// MainUI历史栈
-        /// </summary>
-        private readonly Stack<Panel> _mainUIHistory = new Stack<Panel>();
-
-        /// <summary>
         /// 输入方案栈（后入先出）
         /// </summary>
         private readonly List<(object owner, string scheme)> _inputSchemes = new List<(object, string)>();
@@ -383,6 +378,7 @@ namespace Azathrix.EzUI.Core
         private void InjectPanel(Panel panel)
         {
             // 注入Panel本身
+            panel.UISystem = this;
             AzathrixFramework.InjectTo(panel);
 
             // 注入所有子View
@@ -496,6 +492,11 @@ namespace Azathrix.EzUI.Core
             var list = new List<Panel>();
             foreach (var ui in _instanceUIs)
             {
+                if (!ui)
+                {
+                    list.Add(ui);
+                    continue;
+                }
                 if (_persistenceUI.Contains(ui))
                     continue;
                 list.Add(ui);
@@ -504,6 +505,8 @@ namespace Azathrix.EzUI.Core
             foreach (var ui in list)
             {
                 _instanceUIs.Remove(ui);
+                if (!ui)
+                    continue;
                 if (ui.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown))
                 {
                     try
@@ -962,7 +965,6 @@ namespace Azathrix.EzUI.Core
                 var oldMain = _currentMainUI;
                 if (oldMain != null)
                 {
-                    _mainUIHistory.Push(oldMain);
                     oldMain.Hide(useAnimation);
                 }
 
@@ -1009,9 +1011,6 @@ namespace Azathrix.EzUI.Core
 
                 if (oldMain != null)
                     oldMain.Close(useAnimation);
-
-                // 切换时清空历史
-                _mainUIHistory.Clear();
             }
 
             if (newMain != null)
@@ -1020,42 +1019,6 @@ namespace Azathrix.EzUI.Core
             return newMain;
         }
 
-        /// <summary>
-        /// 返回上一个MainUI
-        /// </summary>
-        public Panel GoBackMainUI(bool useAnimation = true)
-        {
-            if (_mainUIHistory.Count == 0)
-                return null;
-
-            var oldMain = _currentMainUI;
-            var newMain = _mainUIHistory.Pop();
-
-            if (newMain != null)
-            {
-                NotifyMainUIChange(oldMain, newMain);
-                _currentMainUI = newMain;
-                newMain.Show(useAnimation);
-
-                if (oldMain != null)
-                    oldMain.Close(useAnimation);
-            }
-
-            return newMain;
-        }
-
-        /// <summary>
-        /// 清空MainUI历史栈
-        /// </summary>
-        public void ClearMainUIHistory()
-        {
-            _mainUIHistory.Clear();
-        }
-
-        /// <summary>
-        /// 获取MainUI历史栈深度
-        /// </summary>
-        public int MainUIHistoryCount => _mainUIHistory.Count;
 
         /// <summary>
         /// 通知MainUI切换，处理附加UI
@@ -1197,11 +1160,6 @@ namespace Azathrix.EzUI.Core
                 var path = ResolvePath(evt.path, evt.panelType);
                 if (string.IsNullOrWhiteSpace(path)) return;
                 SwitchMainUI(path, evt.useAnimation, evt.userData);
-            }));
-
-            _subscriptions.Add(dispatcher.Subscribe<UIGoBackMainRequest>((ref UIGoBackMainRequest evt) =>
-            {
-                GoBackMainUI(evt.useAnimation);
             }));
 
             _subscriptions.Add(dispatcher.Subscribe<UILoadPersistenceRequest>((ref UILoadPersistenceRequest evt) =>
