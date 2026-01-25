@@ -63,22 +63,6 @@ namespace Azathrix.EzUI.Tests
         }
     }
 
-    internal sealed class TestInputSchemeHandler : ScriptableObject, IEzUIInputSchemeHandler
-    {
-        public int callCount;
-        public string previous;
-        public string current;
-        public object source;
-
-        public void ApplyInputScheme(string prev, string cur, object src)
-        {
-            callCount++;
-            previous = prev;
-            current = cur;
-            source = src;
-        }
-    }
-
     internal sealed class UIEventRecorder : IDisposable
     {
         public int showCount;

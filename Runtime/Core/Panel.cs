@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Azathrix.EzUI.Animations;
+using Azathrix.EzUI.Events;
 using Azathrix.Framework.Core;
 using Azathrix.Framework.Core.Attributes;
 using Azathrix.Framework.Tools;
@@ -69,6 +70,11 @@ namespace Azathrix.EzUI.Core
         /// 动画组件
         /// </summary>
         public UIAnimationComponent animationComponent => _animation;
+
+        /// <summary>
+        /// 动画播放时是否屏蔽输入（可重载，默认使用全局设置）
+        /// </summary>
+        public virtual bool blockInputDuringAnimation => EzUISettings.Instance?.blockInputDuringAnimation ?? true;
 
         private readonly List<View> _views = new List<View>();
 
@@ -312,6 +318,7 @@ namespace Azathrix.EzUI.Core
                 return;
 
             isAnimationPlaying = true;
+            DispatchAnimationStateChanged(true);
 
             try
             {
@@ -323,6 +330,7 @@ namespace Azathrix.EzUI.Core
             }
 
             isAnimationPlaying = false;
+            DispatchAnimationStateChanged(false);
         }
 
         protected virtual async UniTask ShowAnimationAsync()
@@ -332,6 +340,7 @@ namespace Azathrix.EzUI.Core
                 return;
 
             isAnimationPlaying = true;
+            DispatchAnimationStateChanged(true);
 
             try
             {
@@ -343,6 +352,17 @@ namespace Azathrix.EzUI.Core
             }
 
             isAnimationPlaying = false;
+            DispatchAnimationStateChanged(false);
+        }
+
+        private void DispatchAnimationStateChanged(bool isPlaying)
+        {
+            AzathrixFramework.Dispatcher.Dispatch(new UIAnimationStateChanged
+            {
+                isPlaying = isPlaying,
+                source = this,
+                blockInput = blockInputDuringAnimation
+            });
         }
 
         internal CanvasGroup GetOrAddCanvasGroup()

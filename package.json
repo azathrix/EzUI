@@ -17,5 +17,12 @@
         "com.azathrix.framework": "0.0.8",
         "com.azathrix.game-kit": "1.0.4",
         "com.azathrix.unitask": "2.5.10"
-    }
+    },
+    "samples": [
+        {
+            "displayName": "Tests",
+            "description": "UI的一些单元测试和流程测试",
+            "path": "Tests~"
+        }
+    ]
 }

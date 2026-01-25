@@ -87,6 +87,27 @@ namespace Azathrix.EzUI.Events
         public Panel source;
     }
 
+    /// <summary>
+    /// UI 动画状态变化事件
+    /// </summary>
+    public struct UIAnimationStateChanged
+    {
+        /// <summary>
+        /// 是否正在播放动画
+        /// </summary>
+        public bool isPlaying;
+
+        /// <summary>
+        /// 触发动画的 Panel
+        /// </summary>
+        public Panel source;
+
+        /// <summary>
+        /// 是否需要屏蔽输入
+        /// </summary>
+        public bool blockInput;
+    }
+
     // ----- 事件化 API 请求 -----
     public struct UIShowRequest
     {

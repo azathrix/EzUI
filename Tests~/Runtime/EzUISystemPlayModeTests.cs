@@ -151,21 +151,5 @@ namespace Azathrix.EzUI.Tests
             Assert.AreEqual("Game", _ui.CurrentInputScheme);
             yield return null;
         }
-
-        [UnityTest]
-        public IEnumerator InputScheme_Handler_IsCalled()
-        {
-            var handler = ScriptableObject.CreateInstance<TestInputSchemeHandler>();
-            _settings.inputSchemeSwitchMode = EzUISettings.InputSchemeSwitchMode.HandlerThenEvent;
-            _settings.inputSchemeHandler = handler;
-            EzUISettings.SetSettings(_settings);
-
-            _ui.Show<TestPopUI>(false);
-
-            Assert.AreEqual(1, handler.callCount);
-            Assert.AreEqual("Game", handler.previous);
-            Assert.AreEqual("UI", handler.current);
-            yield return null;
-        }
     }
 }

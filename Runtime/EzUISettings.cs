@@ -14,8 +14,7 @@ namespace Azathrix.EzUI
         public enum InputSchemeSwitchMode
         {
             None,
-            EventOnly,
-            HandlerThenEvent
+            EventOnly
         }
 
         [Header("路径")]
@@ -41,9 +40,6 @@ namespace Azathrix.EzUI
         [Tooltip("输入方案切换模式")]
         public InputSchemeSwitchMode inputSchemeSwitchMode = InputSchemeSwitchMode.EventOnly;
 
-        [Tooltip("输入方案处理器（需要实现 IEzUIInputSchemeHandler）")]
-        public Object inputSchemeHandler;
-
         [Header("UIRoot")]
         [Tooltip("当 UIRoot 预设不存在时自动生成")]
         public bool autoCreateUIRoot = true;
@@ -62,5 +58,9 @@ namespace Azathrix.EzUI
 
         [Tooltip("是否启用遮罩点击")]
         public bool maskClickable = true;
+
+        [Header("动画")]
+        [Tooltip("动画播放时屏蔽输入（全局默认值，可被 Panel 重载）")]
+        public bool blockInputDuringAnimation = true;
     }
 }

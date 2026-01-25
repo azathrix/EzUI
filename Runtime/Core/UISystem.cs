@@ -455,9 +455,6 @@ namespace Azathrix.EzUI.Core
             CurrentInputScheme = next;
 
             var mode = Settings?.inputSchemeSwitchMode ?? EzUISettings.InputSchemeSwitchMode.EventOnly;
-            if (mode == EzUISettings.InputSchemeSwitchMode.HandlerThenEvent)
-                TryApplyInputSchemeHandler(prev, next, owner);
-
             if (mode != EzUISettings.InputSchemeSwitchMode.None)
             {
                 Dispatch(new UIInputSchemeChanged
@@ -468,20 +465,6 @@ namespace Azathrix.EzUI.Core
                     source = owner as Panel
                 });
             }
-        }
-
-        private void TryApplyInputSchemeHandler(string previous, string current, object source)
-        {
-            var handlerObj = Settings?.inputSchemeHandler;
-            if (handlerObj == null) return;
-
-            if (handlerObj is IEzUIInputSchemeHandler handler)
-            {
-                handler.ApplyInputScheme(previous, current, source);
-                return;
-            }
-
-            Log.Warning("[EzUI] inputSchemeHandler 未实现 IEzUIInputSchemeHandler");
         }
 
         public void DestroyAll(bool force = false)
