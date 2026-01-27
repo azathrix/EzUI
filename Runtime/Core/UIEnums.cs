@@ -20,4 +20,30 @@ namespace Azathrix.EzUI.Core
         /// </summary>
         Close,
     }
+
+    /// <summary>
+    /// 自动关闭原因
+    /// </summary>
+    public enum AutoCloseReason
+    {
+        /// <summary>
+        /// 点击遮罩
+        /// </summary>
+        MaskClick,
+
+        /// <summary>
+        /// Pop 自动关闭（ESC/返回键）
+        /// </summary>
+        PopAutoClose,
+
+        /// <summary>
+        /// 切换 MainUI
+        /// </summary>
+        MainUISwitch,
+
+        /// <summary>
+        /// 销毁所有 UI
+        /// </summary>
+        DestroyAll,
+    }
 }

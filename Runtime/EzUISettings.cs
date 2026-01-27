@@ -1,6 +1,5 @@
 using Azathrix.Framework.Settings;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Azathrix.EzUI
 {
@@ -11,56 +10,67 @@ namespace Azathrix.EzUI
     [ShowSetting("EzUI")]
     public class EzUISettings : SettingsBase<EzUISettings>
     {
-        public enum InputSchemeSwitchMode
+        /// <summary>
+        /// 初始化模式
+        /// </summary>
+        public enum InitializeMode
         {
-            None,
-            EventOnly
+            /// <summary>
+            /// 自动初始化（从预设或自动创建）
+            /// </summary>
+            Auto,
+
+            /// <summary>
+            /// 手动初始化（需要调用 SetUIRoot 等方法）
+            /// </summary>
+            Manual
         }
 
-        [Header("路径")]
-        [Tooltip("UIRoot 预设路径")]
+
+        // ========== 初始化设置 ==========
+        [HideInInspector]
+        public InitializeMode initializeMode = InitializeMode.Auto;
+
+        // ========== 自动初始化 - 预设模式 ==========
+        [HideInInspector]
         public string uiRootPath = "UI/UIRoot";
 
-        [Tooltip("Panel 默认路径格式，{0} = 类型名")]
-        public string panelPathFormat = "UI/{0}";
-
-        [Header("输入方案")]
-        [Tooltip("游戏输入方案名称（空则使用默认 \"Game\"）")]
-        public string defaultGameInputScheme = "Game";
-
-        [Tooltip("PopUI 默认输入方案名称（空则不切换）")]
-        public string defaultPopUIInputScheme = "UI";
-
-        [Tooltip("FullScreenPopUI 默认输入方案名称（空则不切换）")]
-        public string defaultFullScreenPopUIInputScheme = "UI";
-
-        [Tooltip("FloatingPopUI 默认输入方案名称（空则不切换）")]
-        public string defaultFloatingPopUIInputScheme = "";
-
-        [Tooltip("输入方案切换模式")]
-        public InputSchemeSwitchMode inputSchemeSwitchMode = InputSchemeSwitchMode.EventOnly;
-
-        [Header("UIRoot")]
-        [Tooltip("当 UIRoot 预设不存在时自动生成")]
+        // ========== 自动初始化 - 自动创建模式 ==========
+        [HideInInspector]
         public bool autoCreateUIRoot = true;
 
-        [Tooltip("自动生成的 UIRoot 名称")]
+        [HideInInspector]
         public string autoCreatedUIRootName = "[UIRoot]";
 
-        [Tooltip("自动生成时创建 EventSystem")]
+        [HideInInspector]
         public bool autoCreateEventSystem = true;
 
-        [Tooltip("自动生成时创建 UI Camera")]
+        [HideInInspector]
         public bool autoCreateUICamera = true;
 
-        [Header("遮罩")]
+        [HideInInspector]
+        public string uiCameraTag = "UICamera";
+
+        // ========== 路径设置 ==========
+        [HideInInspector]
+        public string panelPathFormat = "UI/{0}";
+
+        // ========== 输入方案设置 ==========
+        [HideInInspector]
+        public string defaultGameInputScheme = "Game";
+
+        [HideInInspector]
+        public string defaultPopUIInputScheme = "UI";
+
+        // ========== 遮罩设置 ==========
+        [HideInInspector]
         public Color maskColor = new Color(0f, 0f, 0f, 0.95f);
 
-        [Tooltip("是否启用遮罩点击")]
+        [HideInInspector]
         public bool maskClickable = true;
 
-        [Header("动画")]
-        [Tooltip("动画播放时屏蔽输入（全局默认值，可被 Panel 重载）")]
+        // ========== 动画设置 ==========
+        [HideInInspector]
         public bool blockInputDuringAnimation = true;
     }
 }

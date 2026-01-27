@@ -35,7 +35,7 @@ namespace Azathrix.EzUI.Editor
             var currentIndex =
                 UIAnimationEditorUtility.FindTypeIndex(types, current != null ? current.GetType() : null);
 
-            var newIndex = EditorGUILayout.Popup("Animation Component", currentIndex, names);
+            var newIndex = EditorGUILayout.Popup("动画组件", currentIndex, names);
             if (newIndex != currentIndex)
             {
                 if (newIndex == 0)

@@ -62,6 +62,7 @@ namespace Azathrix.EzUI.Core
         /// 默认Mask
         /// </summary>
         private RectTransform _mask;
+        private Image _maskImg;
 
         private bool _maskActive;
         private Panel _maskTarget;
@@ -89,7 +90,7 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 输入方案栈（后入先出）
         /// </summary>
-        private readonly List<(object owner, string scheme)> _inputSchemes = new List<(object, string)>();
+        private readonly List<(Panel owner, string scheme)> _inputSchemes = new();
 
         /// <summary>
         /// 获取当前MainUI
@@ -99,10 +100,43 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 当前输入方案
         /// </summary>
-        public string CurrentInputScheme { get; private set; } = "Game";
+        public string CurrentInputScheme { get; private set; }
+
+        /// <summary>
+        /// 是否已初始化
+        /// </summary>
+        public bool IsInitialized { get; private set; }
+
+        /// <summary>
+        /// EventSystem 引用
+        /// </summary>
+        private EventSystem _eventSystem;
+
+        /// <summary>
+        /// EventSystem
+        /// </summary>
+        public EventSystem EventSystem => _eventSystem;
+
+        /// <summary>
+        /// Loading 处理器
+        /// </summary>
+        private IUILoadingHandler _loadingHandler;
+
+        /// <summary>
+        /// 设置 Loading 处理器
+        /// </summary>
+        public void SetLoadingHandler(IUILoadingHandler handler)
+        {
+            _loadingHandler = handler;
+        }
+
+        /// <summary>
+        /// 获取 Loading 处理器
+        /// </summary>
+        public IUILoadingHandler LoadingHandler => _loadingHandler;
 
         private readonly List<SubscriptionResult> _subscriptions = new List<SubscriptionResult>();
-        
+
         private EzUISettings Settings => EzUISettings.Instance;
 
         private string DefaultGameInputScheme =>
@@ -123,6 +157,71 @@ namespace Azathrix.EzUI.Core
         {
             UnregisterEventHandlers();
         }
+
+        #region Manual Initialization
+
+        /// <summary>
+        /// 手动设置 UI 根节点
+        /// </summary>
+        public void SetUIRoot(Transform root)
+        {
+            if (root == null)
+            {
+                Log.Warning("[EzUI] SetUIRoot: root 不能为空");
+                return;
+            }
+
+            _uiRoot = root;
+            Object.DontDestroyOnLoad(root.gameObject);
+
+            if (_mask == null)
+                InitMask();
+
+            CheckInitialized();
+        }
+
+        /// <summary>
+        /// 手动设置 UI 摄像机
+        /// </summary>
+        public void SetUICamera(Camera camera)
+        {
+            _uiCamera = camera;
+
+            if (_uiCamera != null)
+                SetupURPCameraStack();
+
+            CheckInitialized();
+        }
+
+        /// <summary>
+        /// 手动设置 EventSystem
+        /// </summary>
+        public void SetEventSystem(EventSystem eventSystem)
+        {
+            _eventSystem = eventSystem;
+            CheckInitialized();
+        }
+
+        /// <summary>
+        /// 检查是否完成初始化
+        /// </summary>
+        private void CheckInitialized()
+        {
+            if (IsInitialized) return;
+
+            // 手动模式下，只需要 UIRoot 即可认为初始化完成
+            if (_uiRoot != null)
+            {
+                IsInitialized = true;
+                Dispatch(new UIRootCreated
+                {
+                    root = _uiRoot,
+                    uiCamera = _uiCamera
+                });
+            }
+        }
+
+        #endregion
 
         public T FindUI<T>() where T : Panel
         {
@@ -179,12 +278,12 @@ namespace Azathrix.EzUI.Core
         {
             _instanceUIs.Sort((x, y) =>
             {
-                if (x.IsState(Panel.StateEnum.Shown | Panel.StateEnum.Show) &&
-                    !y.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown))
+                if (x.IsState(Panel.StateEnum.Shown) &&
+                    !y.IsState(Panel.StateEnum.Shown))
                     return -1;
 
-                if (y.IsState(Panel.StateEnum.Shown | Panel.StateEnum.Show) &&
-                    !x.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown))
+                if (y.IsState(Panel.StateEnum.Shown) &&
+                    !x.IsState(Panel.StateEnum.Shown))
                     return 1;
 
                 if (y.layer != x.layer)
@@ -269,7 +368,7 @@ namespace Azathrix.EzUI.Core
             ConfigureMaskRect(_mask, _uiRoot);
             foreach (var ui in _instanceUIs)
             {
-                if (!ui.IsState(Panel.StateEnum.Shown | Panel.StateEnum.Show))
+                if (!ui.IsState(Panel.StateEnum.Shown) && !ui.IsVisible)
                     continue;
 
                 if (!maskFlag && ui.useMask)
@@ -281,6 +380,15 @@ namespace Azathrix.EzUI.Core
                     _mask.gameObject.SetActive(true);
                     maskFlag = true;
                     _maskTarget = ui;
+
+                    // 应用遮罩颜色（优先使用 Panel 的局部设置）
+                    if (_maskImg == null)
+                        _maskImg = _mask.GetComponent<Image>();
+                    if (_maskImg != null)
+                    {
+                        var color = ui.maskColor ?? Settings?.maskColor ?? new Color(0f, 0f, 0f, 0.95f);
+                        _maskImg.color = color;
+                    }
                 }
 
                 if (!focusFlag)
@@ -434,7 +542,7 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 设置输入方案（不依赖具体输入系统）
         /// </summary>
-        public void SetInputScheme(object owner, string scheme)
+        public void SetInputScheme(Panel owner, string scheme)
         {
             if (owner == null) return;
 
@@ -454,17 +562,13 @@ namespace Azathrix.EzUI.Core
             var prev = CurrentInputScheme;
             CurrentInputScheme = next;
 
-            var mode = Settings?.inputSchemeSwitchMode ?? EzUISettings.InputSchemeSwitchMode.EventOnly;
-            if (mode != EzUISettings.InputSchemeSwitchMode.None)
+            Dispatch(new UIInputSchemeChanged
             {
-                Dispatch(new UIInputSchemeChanged
-                {
-                    previous = prev,
-                    current = next,
-                    count = _inputSchemes.Count,
-                    source = owner as Panel
-                });
-            }
+                previous = prev,
+                current = next,
+                count = _inputSchemes.Count,
+                source = owner 
+            });
         }
 
         public void DestroyAll(bool force = false)
@@ -480,6 +584,7 @@ namespace Azathrix.EzUI.Core
                     list.Add(ui);
                     continue;
                 }
+
                 if (_persistenceUI.Contains(ui))
                     continue;
                 list.Add(ui);
@@ -490,7 +595,7 @@ namespace Azathrix.EzUI.Core
                 _instanceUIs.Remove(ui);
                 if (!ui)
                     continue;
-                if (ui.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown))
+                if (ui.IsState(Panel.StateEnum.Shown))
                 {
                     try
                     {
@@ -544,7 +649,7 @@ namespace Azathrix.EzUI.Core
         {
             foreach (var ui in _instanceUIs)
             {
-                if (ui.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown) && ui is PopUI popUI)
+                if (ui.IsState(Panel.StateEnum.Shown) && ui is PopUI popUI)
                     return popUI;
             }
 
@@ -555,7 +660,7 @@ namespace Azathrix.EzUI.Core
         {
             foreach (var ui in _instanceUIs)
             {
-                if (ui.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown) && ui is PopUI)
+                if (ui.IsState(Panel.StateEnum.Shown) && ui is PopUI)
                     return true;
             }
 
@@ -703,8 +808,18 @@ namespace Azathrix.EzUI.Core
         public UniTask OnInitializeAsync()
         {
             CurrentInputScheme = DefaultGameInputScheme;
+
+            var mode = Settings?.initializeMode ?? EzUISettings.InitializeMode.Auto;
+            if (mode == EzUISettings.InitializeMode.Manual)
+            {
+                // 手动模式下，等待用户调用 SetUIRoot 等方法
+                return UniTask.CompletedTask;
+            }
+
+            // 自动模式
             InitFromPrefab();
             InitMask();
+            IsInitialized = true;
             return UniTask.CompletedTask;
         }
 
@@ -749,7 +864,30 @@ namespace Azathrix.EzUI.Core
             Object.DontDestroyOnLoad(rootGo);
             _uiRoot = rootGo.transform;
 
-            if (Settings?.autoCreateUICamera ?? true)
+            // 尝试通过 Tag 查找已存在的 UICamera
+            var uiCameraTag = Settings?.uiCameraTag ?? "UICamera";
+            if (!string.IsNullOrWhiteSpace(uiCameraTag))
+            {
+                try
+                {
+                    var existingCamGo = GameObject.FindWithTag(uiCameraTag);
+                    if (existingCamGo != null)
+                    {
+                        _uiCamera = existingCamGo.GetComponent<Camera>();
+                        if (_uiCamera != null)
+                        {
+                            SetupURPCameraStack();
+                        }
+                    }
+                }
+                catch
+                {
+                    // Tag 不存在时会抛出异常，忽略
+                }
+            }
+
+            // 如果没有找到已存在的 UICamera，则创建新的
+            if (_uiCamera == null && (Settings?.autoCreateUICamera ?? true))
             {
                 var camGo = new GameObject("UICamera");
                 camGo.transform.SetParent(_uiRoot);
@@ -766,19 +904,18 @@ namespace Azathrix.EzUI.Core
                 SetupURPCameraStack();
             }
 
-            if (Settings?.autoCreateEventSystem ?? true)
+            // 检查是否已存在 EventSystem
+            _eventSystem = Object.FindObjectOfType<EventSystem>();
+            if (_eventSystem == null && (Settings?.autoCreateEventSystem ?? true))
             {
-                if (Object.FindObjectOfType<EventSystem>() == null)
-                {
-                    var esGo = new GameObject("EventSystem");
-                    esGo.transform.SetParent(_uiRoot);
-                    esGo.AddComponent<EventSystem>();
+                var esGo = new GameObject("EventSystem");
+                esGo.transform.SetParent(_uiRoot);
+                _eventSystem = esGo.AddComponent<EventSystem>();
 #if ENABLE_INPUT_SYSTEM
-                    esGo.AddComponent<InputSystemUIInputModule>();
+                esGo.AddComponent<InputSystemUIInputModule>();
 #else
-                    Log.Warning("[EzUI] 新输入系统未启用，EventSystem 未添加输入模块");
+                Log.Warning("[EzUI] 新输入系统未启用，EventSystem 未添加输入模块");
 #endif
-                }
             }
 
             Dispatch(new UIRootCreated
@@ -870,49 +1007,64 @@ namespace Azathrix.EzUI.Core
             return f;
         }
 
+        /// <summary>
+        /// 自动关闭 Panel
+        /// </summary>
+        /// <param name="panel">要关闭的 Panel</param>
+        /// <param name="reason">关闭原因</param>
+        /// <param name="useAnimation">是否使用动画</param>
+        public void AutoClose(Panel panel, AutoCloseReason reason, bool useAnimation = true)
+        {
+            if (panel == null) return;
+            panel.OnAutoClose(reason, useAnimation);
+        }
+
+        /// <summary>
+        /// 自动关闭 Panel（泛型版本）
+        /// </summary>
+        public void AutoClose<T>(AutoCloseReason reason, bool useAnimation = true) where T : Panel
+        {
+            var panel = FindUI<T>();
+            if (panel != null)
+                panel.OnAutoClose(reason, useAnimation);
+        }
+
+        /// <summary>
+        /// 自动关闭 Panel（路径版本）
+        /// </summary>
+        public void AutoClose(string path, AutoCloseReason reason, bool useAnimation = true)
+        {
+            var panel = FindUI(path);
+            if (panel != null)
+                panel.OnAutoClose(reason, useAnimation);
+        }
+
         public void AutoClosePopUI(PopUI pop, bool useAnimation)
         {
-            if (pop.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown))
-            {
-                if (pop.autoCloseTopType == AutoCloseTopTypeEnum.Close)
-                {
-                    pop.Close(useAnimation);
-                    return;
-                }
-                else if (pop.autoCloseTopType == AutoCloseTopTypeEnum.Hide)
-                {
-                    pop.Hide(useAnimation);
-                    return;
-                }
-                else if (pop.autoCloseTopType == AutoCloseTopTypeEnum.None)
-                {
-                    return;
-                }
-            }
+            if (pop == null) return;
+            if (!pop.IsState(Panel.StateEnum.Shown)) return;
+            if (pop.autoCloseTopType == AutoCloseTopTypeEnum.None ||
+                pop.autoCloseTopType == AutoCloseTopTypeEnum.Ignore)
+                return;
+
+            AutoClose(pop, AutoCloseReason.PopAutoClose, useAnimation);
         }
 
         public void AutoCloseTopPopUI(bool useAnimation = true)
         {
-            SortUI();
             for (int i = 0; i < _instanceUIs.Count; i++)
             {
                 var ui = _instanceUIs[i];
-                if (ui.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown) && ui is PopUI pop)
+                if (ui.IsState(Panel.StateEnum.Shown) && ui is PopUI pop)
                 {
-                    if (pop.autoCloseTopType == AutoCloseTopTypeEnum.Close)
-                    {
-                        pop.Close(useAnimation);
+                    if (pop.autoCloseTopType == AutoCloseTopTypeEnum.Ignore)
+                        continue;
+
+                    if (pop.autoCloseTopType == AutoCloseTopTypeEnum.None)
                         break;
-                    }
-                    else if (pop.autoCloseTopType == AutoCloseTopTypeEnum.Hide)
-                    {
-                        pop.Hide(useAnimation);
-                        break;
-                    }
-                    else if (pop.autoCloseTopType == AutoCloseTopTypeEnum.None)
-                    {
-                        break;
-                    }
+
+                    AutoClose(pop, AutoCloseReason.PopAutoClose, useAnimation);
+                    break;
                 }
             }
         }
@@ -942,21 +1094,28 @@ namespace Azathrix.EzUI.Core
             if (existing == null && !IsMainUIPath(path))
                 return null;
 
-            var newMain = Show(path, useAnimation, userData);
-            if (newMain != null && newMain != _currentMainUI)
+            var oldMain = _currentMainUI;
+
+            // 同一个 MainUI 重复调用时，先隐藏再显示
+            if (existing != null && existing == oldMain)
             {
-                var oldMain = _currentMainUI;
-                if (oldMain != null)
+                existing.Hide(useAnimation);
+            }
+
+            var newMain = Show(path, useAnimation, userData);
+
+            if (newMain != null)
+            {
+                if (oldMain != null && oldMain != newMain)
                 {
                     oldMain.Hide(useAnimation);
                 }
 
+                // 即使是同一个 MainUI 也触发切换通知
                 NotifyMainUIChange(oldMain, newMain);
                 _currentMainUI = newMain;
-            }
-
-            if (newMain != null)
                 newMain.userData = userData;
+            }
 
             return newMain;
         }
@@ -985,21 +1144,118 @@ namespace Azathrix.EzUI.Core
             if (existing == null && !IsMainUIPath(path))
                 return null;
 
-            var newMain = Show(path, useAnimation, userData);
-
-            if (newMain != null && newMain != oldMain)
+            // 同一个 MainUI 重复调用时，先关闭再重新创建
+            if (existing != null && existing == oldMain)
             {
-                NotifyMainUIChange(oldMain, newMain);
-                _currentMainUI = newMain;
-
-                if (oldMain != null)
-                    oldMain.Close(useAnimation);
+                existing.Close(useAnimation);
+                _currentMainUI = null;
             }
 
+            var newMain = Show(path, useAnimation, userData);
+
             if (newMain != null)
+            {
+                // 关闭旧的 MainUI（如果不是同一个）
+                if (oldMain != null && oldMain != existing)
+                {
+                    oldMain.Close(useAnimation);
+                }
+
+                // 即使是同一个 MainUI 也触发切换通知
+                NotifyMainUIChange(oldMain, newMain);
+                _currentMainUI = newMain;
                 newMain.userData = userData;
+            }
 
             return newMain;
+        }
+
+        /// <summary>
+        /// 显示MainUI（带Loading，异步版本）
+        /// 只有实现 IMainUILoadable 接口的 MainUI 才会显示 Loading
+        /// </summary>
+        public async UniTask<T> ShowMainUIAsync<T>(bool useAnimation = true, object userData = null) where T : Panel, IMainUI
+        {
+            return await ShowMainUIAsync(GetPath(typeof(T)), useAnimation, userData) as T;
+        }
+
+        public async UniTask<Panel> ShowMainUIAsync(string path, bool useAnimation = true, object userData = null)
+        {
+            // 先检查目标 UI 是否实现了 IMainUILoadable
+            var prefab = LoadUI(path);
+            var loadablePrefab = prefab as IMainUILoadable;
+            var needLoading = _loadingHandler != null && loadablePrefab != null;
+
+            ILoadingController controller = null;
+            if (needLoading)
+            {
+                var config = loadablePrefab.LoadingConfig;
+                controller = await _loadingHandler.ShowLoading(config);
+            }
+
+            var result = ShowMainUI(path, useAnimation, userData);
+
+            // 如果新 UI 实现了 IMainUILoadable，执行加载过程
+            if (needLoading && result is IMainUILoadable loadable)
+            {
+                try
+                {
+                    await loadable.OnLoading(controller);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+
+            if (needLoading)
+                await _loadingHandler.HideLoading();
+
+            return result;
+        }
+
+        /// <summary>
+        /// 切换MainUI（带Loading，异步版本）
+        /// 只有实现 IMainUILoadable 接口的 MainUI 才会显示 Loading
+        /// </summary>
+        public async UniTask<T> SwitchMainUIAsync<T>(bool useAnimation = true, object userData = null) where T : Panel, IMainUI
+        {
+            return await SwitchMainUIAsync(GetPath(typeof(T)), useAnimation, userData) as T;
+        }
+
+        public async UniTask<Panel> SwitchMainUIAsync(string path, bool useAnimation = true, object userData = null)
+        {
+            // 先检查目标 UI 是否实现了 IMainUILoadable
+            var prefab = LoadUI(path);
+            var loadablePrefab = prefab as IMainUILoadable;
+            var needLoading = _loadingHandler != null && loadablePrefab != null;
+
+            ILoadingController controller = null;
+            if (needLoading)
+            {
+                var config = loadablePrefab.LoadingConfig;
+                controller = await _loadingHandler.ShowLoading(config);
+            }
+
+            var result = SwitchMainUI(path, useAnimation, userData);
+
+            // 如果新 UI 实现了 IMainUILoadable，执行加载过程
+            if (needLoading && result is IMainUILoadable loadable)
+            {
+                try
+                {
+                    await loadable.OnLoading(controller);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+
+            if (needLoading)
+                await _loadingHandler.HideLoading();
+
+            return result;
         }
 
 
@@ -1022,20 +1278,8 @@ namespace Azathrix.EzUI.Core
                 if (_persistenceUI.Contains(ui))
                     continue;
 
-                // 根据UI的mainUIChangeBehavior处理
-                switch (ui.mainUIChangeBehavior)
-                {
-                    case MainUIChangeBehavior.None:
-                        break;
-                    case MainUIChangeBehavior.Hide:
-                        if (ui.IsState(Panel.StateEnum.Show | Panel.StateEnum.Shown))
-                            ui.Hide(true);
-                        break;
-                    case MainUIChangeBehavior.Close:
-                        if (!ui.IsState(Panel.StateEnum.Close))
-                            ui.Close(true);
-                        break;
-                }
+                // 调用 OnAutoClose，由各 Panel 自行决定关闭行为
+                ui.OnAutoClose(AutoCloseReason.MainUISwitch);
             }
 
             Dispatch(new UIMainUIChanged
@@ -1058,19 +1302,13 @@ namespace Azathrix.EzUI.Core
 
             switch (current)
             {
-                case Panel.StateEnum.Show:
-                    Dispatch(new UIPanelShow {panel = panel, path = panel.path});
-                    break;
                 case Panel.StateEnum.Shown:
                     Dispatch(new UIPanelShown {panel = panel, path = panel.path});
-                    break;
-                case Panel.StateEnum.Hide:
-                    Dispatch(new UIPanelHide {panel = panel, path = panel.path});
                     break;
                 case Panel.StateEnum.Hidden:
                     Dispatch(new UIPanelHidden {panel = panel, path = panel.path});
                     break;
-                case Panel.StateEnum.Close:
+                case Panel.StateEnum.Closed:
                     Dispatch(new UIPanelClose {panel = panel, path = panel.path});
                     if (panel == _currentMainUI)
                     {
@@ -1082,6 +1320,7 @@ namespace Azathrix.EzUI.Core
                             current = null
                         });
                     }
+
                     break;
             }
         }
@@ -1164,10 +1403,7 @@ namespace Azathrix.EzUI.Core
                     CancelPersistenceUI(panel);
             }));
 
-            _subscriptions.Add(dispatcher.Subscribe<UIRefreshRequest>((ref UIRefreshRequest evt) =>
-            {
-                RefreshUI();
-            }));
+            _subscriptions.Add(dispatcher.Subscribe<UIRefreshRequest>((ref UIRefreshRequest evt) => { RefreshUI(); }));
         }
 
         private void UnregisterEventHandlers()
@@ -1176,6 +1412,7 @@ namespace Azathrix.EzUI.Core
             {
                 subscription.Unsubscribe();
             }
+
             _subscriptions.Clear();
         }
 

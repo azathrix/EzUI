@@ -46,9 +46,6 @@ namespace Azathrix.EzUI.Core
         /// </summary>
         public virtual AutoCloseTopTypeEnum autoCloseTopType => AutoCloseTopTypeEnum.Hide;
 
-        protected virtual bool useUIEvent { get; } = true;
-
-
         protected override void OnShow()
         {
             base.OnShow();
@@ -63,37 +60,58 @@ namespace Azathrix.EzUI.Core
                 UISystem?.SetInputScheme(this, null);
         }
 
-        protected override void OnScriptActivate()
+        /// <summary>
+        /// 自动关闭时调用（重载以处理不同关闭原因）
+        /// </summary>
+        public override void OnAutoClose(AutoCloseReason reason, bool useAnimation = true)
         {
-            base.OnScriptActivate();
-        }
+            switch (reason)
+            {
+                case AutoCloseReason.MaskClick:
+                    switch (maskClickOperation)
+                    {
+                        case MaskClickOperationType.None:
+                            break;
+                        case MaskClickOperationType.Hide:
+                            Hide(true);
+                            break;
+                        case MaskClickOperationType.Close:
+                            Close(true);
+                            break;
+                        case MaskClickOperationType.DirectClose:
+                            Close(false);
+                            break;
+                        case MaskClickOperationType.DirectHide:
+                            Hide(false);
+                            break;
+                    }
+                    break;
 
-        protected override void OnScriptDeactivate()
-        {
-            base.OnScriptDeactivate();
+                case AutoCloseReason.PopAutoClose:
+                    switch (autoCloseTopType)
+                    {
+                        case AutoCloseTopTypeEnum.None:
+                        case AutoCloseTopTypeEnum.Ignore:
+                            break;
+                        case AutoCloseTopTypeEnum.Hide:
+                            Hide(useAnimation);
+                            break;
+                        case AutoCloseTopTypeEnum.Close:
+                            Close(useAnimation);
+                            break;
+                    }
+                    break;
+
+                default:
+                    // MainUISwitch, DestroyAll 等使用基类默认行为
+                    base.OnAutoClose(reason, useAnimation);
+                    break;
+            }
         }
 
         public virtual void OnMaskClick()
         {
-            switch (maskClickOperation)
-            {
-                case MaskClickOperationType.None:
-                    break;
-                case MaskClickOperationType.Hide:
-                    Hide();
-                    break;
-                case MaskClickOperationType.Close:
-                    Close();
-                    break;
-                case MaskClickOperationType.DirectClose:
-                    Close(false);
-                    break;
-                case MaskClickOperationType.DirectHide:
-                    Hide(false);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+            OnAutoClose(AutoCloseReason.MaskClick);
         }
     }
 }

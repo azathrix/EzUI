@@ -1,7 +1,7 @@
 ﻿{
     "name": "com.azathrix.ezui",
     "displayName": "EzUI",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "unity": "6000.3",
     "description": "\u8fd9\u662f\u4e00\u4e2a\u7b80\u5355\u7684UI\u7cfb\u7edf.",
     "keywords": [
@@ -21,7 +21,7 @@
     "samples": [
         {
             "displayName": "Tests",
-            "description": "UI的一些单元测试和流程测试",
+            "description": "UI\u7684\u4e00\u4e9b\u5355\u5143\u6d4b\u8bd5\u548c\u6d41\u7a0b\u6d4b\u8bd5",
             "path": "Tests~"
         }
     ]
