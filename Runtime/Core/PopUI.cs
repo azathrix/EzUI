@@ -38,7 +38,7 @@ namespace Azathrix.EzUI.Core
         /// <summary>
         /// 输入方案（为空则不切换）
         /// </summary>
-        protected virtual string inputScheme =>
+        public override string InputScheme =>
             EzUISettings.Instance?.defaultPopUIInputScheme ?? "UI";
 
         /// <summary>
@@ -49,15 +49,11 @@ namespace Azathrix.EzUI.Core
         protected override void OnShow()
         {
             base.OnShow();
-            if (!string.IsNullOrWhiteSpace(inputScheme))
-                UISystem?.SetInputScheme(this, inputScheme);
         }
 
         protected override void OnHide()
         {
             base.OnHide();
-            if (!string.IsNullOrWhiteSpace(inputScheme))
-                UISystem?.SetInputScheme(this, null);
         }
 
         /// <summary>

@@ -239,6 +239,12 @@ namespace Azathrix.EzUI.Core
                 }
             }
 
+            if (!focusFlag && _currentUIFocus != null)
+            {
+                _currentUIFocus.isFocused = false;
+                _currentUIFocus = null;
+            }
+
             if (!maskFlag)
             {
                 _mask.gameObject.SetActive(false);
@@ -248,6 +254,7 @@ namespace Azathrix.EzUI.Core
 
             if (prevFocus != _currentUIFocus)
             {
+                UpdateFocusInputScheme(prevFocus, _currentUIFocus);
                 Dispatch(new UIFocusChanged
                 {
                     previous = prevFocus,
@@ -263,6 +270,17 @@ namespace Azathrix.EzUI.Core
                     target = _maskTarget
                 });
             }
+        }
+
+        private void UpdateFocusInputScheme(IUIFocus previous, IUIFocus current)
+        {
+            var prevPanel = previous as Panel;
+            if (prevPanel != null && !string.IsNullOrWhiteSpace(previous?.InputScheme))
+                SetInputScheme(prevPanel, null);
+
+            var currentPanel = current as Panel;
+            if (currentPanel != null && !string.IsNullOrWhiteSpace(current?.InputScheme))
+                SetInputScheme(currentPanel, current.InputScheme);
         }
 
         #endregion

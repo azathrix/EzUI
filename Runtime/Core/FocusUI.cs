@@ -2,6 +2,9 @@ using Azathrix.EzUI.Interfaces;
 
 namespace Azathrix.EzUI.Core
 {
+    /// <summary>
+    /// 焦点 UI 基类
+    /// </summary>
     public class FocusUI : Panel, IUIFocus
     {
         private bool _focus;
@@ -18,6 +21,8 @@ namespace Azathrix.EzUI.Core
                 }
             }
         }
+
+        public virtual string InputScheme => null;
 
         protected virtual void OnFocusChanged()
         {

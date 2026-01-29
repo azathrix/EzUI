@@ -74,7 +74,7 @@ namespace Azathrix.EzUI.Tests
                 source = owner
             });
 
-            Assert.AreEqual("UI", GetOverlayValue(_ezInputSystem, "InputMapType"));
+            Assert.AreEqual("UI", GetOverlayValue(_ezInputSystem, "CurrentMap"));
 
             AzathrixFramework.Dispatcher.Dispatch(new UIInputSchemeChanged
             {
@@ -84,7 +84,7 @@ namespace Azathrix.EzUI.Tests
                 source = owner
             });
 
-            Assert.AreEqual("Game", GetOverlayValue(_ezInputSystem, "InputMapType"));
+            Assert.AreEqual("Game", GetOverlayValue(_ezInputSystem, "CurrentMap"));
 
             UnityEngine.Object.Destroy(ownerGo);
             yield return null;
@@ -128,9 +128,17 @@ namespace Azathrix.EzUI.Tests
         {
             var prop = ezInputSystem.GetType().GetProperty(propertyName);
             var overlay = prop?.GetValue(ezInputSystem);
-            var valueProp = overlay?.GetType().GetProperty("Value");
-            var value = valueProp?.GetValue(overlay);
-            return value?.ToString();
+            if (overlay == null)
+                return null;
+
+            var valueProp = overlay.GetType().GetProperty("Value");
+            if (valueProp != null)
+            {
+                var value = valueProp.GetValue(overlay);
+                return value?.ToString();
+            }
+
+            return overlay.ToString();
         }
 
         private static void ConfigureEzInputSettings()

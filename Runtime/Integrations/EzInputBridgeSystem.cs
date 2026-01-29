@@ -1,7 +1,6 @@
 #if EZINPUT_INSTALLED
 using System.Collections.Generic;
 using Azathrix.EzInput.Core;
-using Azathrix.EzInput.Enums;
 using Azathrix.EzUI.Events;
 using Azathrix.Framework.Core;
 using Azathrix.Framework.Core.Attributes;
@@ -22,7 +21,6 @@ namespace Azathrix.EzUI.Integrations
 
         private SubscriptionResult _schemeSub;
         private SubscriptionResult _animSub;
-        private readonly Dictionary<object, Token> _ownerTokenMap = new();
         private readonly Dictionary<object, Token> _animationTokenMap = new();
 
         public UniTask OnInitializeAsync() => UniTask.CompletedTask;
@@ -44,12 +42,6 @@ namespace Azathrix.EzUI.Integrations
 
             if (EzInput != null)
             {
-                foreach (var token in _ownerTokenMap.Values)
-                {
-                    if (token.IsValid)
-                        EzInput.RemoveMap(token);
-                }
-
                 foreach (var token in _animationTokenMap.Values)
                 {
                     if (token.IsValid)
@@ -58,7 +50,6 @@ namespace Azathrix.EzUI.Integrations
             }
 
             _animationTokenMap.Clear();
-            _ownerTokenMap.Clear();
         }
 
         private void OnUIInputSchemeChanged(ref UIInputSchemeChanged evt)
@@ -66,19 +57,11 @@ namespace Azathrix.EzUI.Integrations
             if (EzInput == null)
                 return;
 
-            object source = evt.source;
-            if (evt.current == "UI" || evt.current == "Menu")
-            {
-                SetMap(source, InputMapType.UI, evt.count);
-            }
-            else if (evt.current == "Game" || string.IsNullOrEmpty(evt.current))
-            {
-                RemoveMap(source);
-            }
-            else
-            {
-                SetMap(source, InputMapType.UI, evt.count);
-            }
+            var mapName = ResolveMapName(evt.current);
+            if (string.IsNullOrWhiteSpace(mapName))
+                return;
+
+            EzInput.SetMap(mapName);
         }
 
         private void OnUIAnimationStateChanged(ref UIAnimationStateChanged evt)
@@ -104,30 +87,13 @@ namespace Azathrix.EzUI.Integrations
             }
         }
 
-        private Token SetMap(object owner, InputMapType type, int priority = 0)
+        private static string ResolveMapName(string scheme)
         {
-            if (owner != null && _ownerTokenMap.TryGetValue(owner, out var existing))
-            {
-                EzInput.SetMap(existing, type, priority);
-                return existing;
-            }
-
-            var token = EzInput.SetMap(type, priority);
-            if (owner != null)
-                _ownerTokenMap[owner] = token;
-            return token;
-        }
-
-        private void RemoveMap(object owner)
-        {
-            if (owner == null)
-                return;
-
-            if (_ownerTokenMap.TryGetValue(owner, out var token))
-            {
-                EzInput.RemoveMap(token);
-                _ownerTokenMap.Remove(owner);
-            }
+            if (string.IsNullOrWhiteSpace(scheme))
+                return null;
+            if (scheme == "Menu")
+                return "UI";
+            return scheme;
         }
     }
 }

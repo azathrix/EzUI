@@ -76,6 +76,9 @@ namespace Azathrix.EzUI.Core
         public virtual MainUIChangeBehavior mainUIChangeBehavior => MainUIChangeBehavior.Close;
 
         /// <summary>
+        /// 输入方案（为空则不切换）
+        /// </summary>
+        /// <summary>
         /// 遮罩颜色（可重载，返回 null 使用全局设置）
         /// </summary>
         public virtual Color? maskColor => null;

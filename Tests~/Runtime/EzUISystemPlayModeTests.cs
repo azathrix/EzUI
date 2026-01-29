@@ -482,10 +482,6 @@ namespace Azathrix.EzUI.Tests
             var pop = popHandle.panel;
             Assert.IsNotNull(pop);
             Assert.IsTrue(pop.IsState(Panel.StateEnum.Shown));
-            if (_ui.CurrentInputScheme != "UI")
-            {
-                _ui.SetInputScheme(pop, "UI");
-            }
             Assert.AreEqual("UI", _ui.CurrentInputScheme);
             Assert.GreaterOrEqual(recorder.inputSchemeChangedCount, 1);
             if (recorder.maskChangedCount > 0)
@@ -497,12 +493,8 @@ namespace Azathrix.EzUI.Tests
                 Assert.GreaterOrEqual(recorder.focusChangedCount, 1);
 
             var hideHandle = _ui.Hide<TestPopUI>(false);
-            if (_ui.CurrentInputScheme != "Game")
-            {
-                _ui.SetInputScheme(pop, null);
-            }
-            Assert.AreEqual("Game", _ui.CurrentInputScheme);
             yield return hideHandle.Task.ToCoroutine();
+            Assert.AreEqual("Game", _ui.CurrentInputScheme);
         }
 
         [UnityTest]
@@ -530,24 +522,18 @@ namespace Azathrix.EzUI.Tests
         {
             var pop1Handle = _ui.Show<TestPopUI>(false);
             yield return pop1Handle.Task.ToCoroutine();
-            if (_ui.CurrentInputScheme != "UI")
-                _ui.SetInputScheme(pop1Handle.panel, "UI");
             Assert.AreEqual("UI", _ui.CurrentInputScheme);
 
             var pop2Handle = _ui.Show<TestPopUIAlt>(false);
             yield return pop2Handle.Task.ToCoroutine();
-            if (_ui.CurrentInputScheme != "UI2")
-                _ui.SetInputScheme(pop2Handle.panel, "UI2");
             Assert.AreEqual("UI2", _ui.CurrentInputScheme);
 
             var hide2 = _ui.Hide<TestPopUIAlt>(false);
             yield return hide2.Task.ToCoroutine();
-            _ui.SetInputScheme(pop2Handle.panel, null);
             Assert.AreEqual("UI", _ui.CurrentInputScheme);
 
             var hide1 = _ui.Hide<TestPopUI>(false);
             yield return hide1.Task.ToCoroutine();
-            _ui.SetInputScheme(pop1Handle.panel, null);
             Assert.AreEqual("Game", _ui.CurrentInputScheme);
         }
 
@@ -778,8 +764,6 @@ namespace Azathrix.EzUI.Tests
         {
             var popHandle = _ui.Show<TestPopUI>(false);
             yield return popHandle.Task.ToCoroutine();
-            if (_ui.CurrentInputScheme != "UI")
-                _ui.SetInputScheme(popHandle.panel, "UI");
             Assert.AreEqual("UI", _ui.CurrentInputScheme);
 
             var destroyHandle = _ui.Destroy(popHandle.panel);

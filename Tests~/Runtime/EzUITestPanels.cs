@@ -83,18 +83,18 @@ namespace Azathrix.EzUI.Tests
 
     public class TestPopUI : PopUI
     {
-        protected override string inputScheme => "UI";
+        public override string InputScheme => "UI";
     }
 
     public class TestPopUIAlt : PopUI
     {
-        protected override string inputScheme => "UI2";
+        public override string InputScheme => "UI2";
     }
 
     public class TestMaskClickPopUI : PopUI
     {
         protected override MaskClickOperationType maskClickOperation => MaskClickOperationType.Hide;
-        protected override string inputScheme => "UI";
+        public override string InputScheme => "UI";
     }
 
     public class TestAutoCloseNonePanel : Panel
