@@ -1,0 +1,28 @@
+{
+    "name": "Azathrix.EzUI.EzInputBridge",
+    "rootNamespace": "Azathrix.EzUI.Integrations",
+    "references": [
+        "Azathrix.EzUI",
+        "Azathrix.Framework.Runtime",
+        "Azathrix.GameKit.Runtime",
+        "Azathrix.EzInput",
+        "UniTask"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "EZINPUT_INSTALLED"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.azathrix.ez-input",
+            "expression": "",
+            "define": "EZINPUT_INSTALLED"
+        }
+    ],
+    "noEngineReferences": false
+}

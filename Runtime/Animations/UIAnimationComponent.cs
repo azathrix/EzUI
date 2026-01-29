@@ -1,3 +1,4 @@
+using System.Threading;
 using Azathrix.EzUI.Core;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -11,10 +12,20 @@ namespace Azathrix.EzUI.Animations
     {
         public virtual UniTask PlayShowAsync(Panel panel)
         {
+            return PlayShowAsync(panel, CancellationToken.None);
+        }
+
+        public virtual UniTask PlayShowAsync(Panel panel, CancellationToken cancellationToken)
+        {
             return UniTask.CompletedTask;
         }
 
         public virtual UniTask PlayHideAsync(Panel panel)
+        {
+            return PlayHideAsync(panel, CancellationToken.None);
+        }
+
+        public virtual UniTask PlayHideAsync(Panel panel, CancellationToken cancellationToken)
         {
             return UniTask.CompletedTask;
         }

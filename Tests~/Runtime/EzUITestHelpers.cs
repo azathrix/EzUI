@@ -61,6 +61,60 @@ namespace Azathrix.EzUI.Tests
             go.AddComponent<T>();
             return go;
         }
+
+        public static GameObject CreatePanelPrefabWithView<TPanel, TView>(string name, Color color)
+            where TPanel : Panel
+            where TView : View
+        {
+            var go = CreatePanelPrefab<TPanel>(name, color);
+            var viewGo = new GameObject("View", typeof(RectTransform));
+            viewGo.transform.SetParent(go.transform, false);
+            viewGo.AddComponent<TView>();
+            return go;
+        }
+    }
+
+    internal sealed class TestLoadingController : ILoadingController
+    {
+        public int progressCount;
+        public int textCount;
+        public int titleCount;
+
+        public void SetProgress(float progress)
+        {
+            progressCount++;
+        }
+
+        public void SetText(string text)
+        {
+            textCount++;
+        }
+
+        public void SetTitle(string title)
+        {
+            titleCount++;
+        }
+    }
+
+    internal sealed class TestLoadingHandler : IUILoadingHandler
+    {
+        public int showCount;
+        public int hideCount;
+        public LoadingConfig lastConfig;
+        public readonly TestLoadingController controller = new TestLoadingController();
+
+        public UniTask<ILoadingController> ShowLoading(LoadingConfig config)
+        {
+            showCount++;
+            lastConfig = config;
+            return UniTask.FromResult<ILoadingController>(controller);
+        }
+
+        public UniTask HideLoading()
+        {
+            hideCount++;
+            return UniTask.CompletedTask;
+        }
     }
 
     internal sealed class UIEventRecorder : IDisposable
@@ -71,13 +125,12 @@ namespace Azathrix.EzUI.Tests
         public int hiddenCount;
         public int closeCount;
         public int destroyCount;
-        public int mainChangedCount;
+        public int createdCount;
         public int inputSchemeChangedCount;
         public int maskChangedCount;
         public int focusChangedCount;
 
         public Panel lastPanel;
-        public Panel lastMainUI;
         public string lastInputScheme;
         public bool lastMaskActive;
         public Panel lastMaskTarget;
@@ -88,6 +141,12 @@ namespace Azathrix.EzUI.Tests
         public void Start()
         {
             var dispatcher = AzathrixFramework.Dispatcher;
+
+            _subs.Add(dispatcher.Subscribe<UIPanelCreated>((ref UIPanelCreated evt) =>
+            {
+                createdCount++;
+                lastPanel = evt.panel;
+            }).AsResult());
 
             _subs.Add(dispatcher.Subscribe<UIPanelShow>((ref UIPanelShow evt) =>
             {
@@ -123,12 +182,6 @@ namespace Azathrix.EzUI.Tests
             {
                 destroyCount++;
                 lastPanel = evt.panel;
-            }).AsResult());
-
-            _subs.Add(dispatcher.Subscribe<UIMainUIChanged>((ref UIMainUIChanged evt) =>
-            {
-                mainChangedCount++;
-                lastMainUI = evt.current;
             }).AsResult());
 
             _subs.Add(dispatcher.Subscribe<UIInputSchemeChanged>((ref UIInputSchemeChanged evt) =>

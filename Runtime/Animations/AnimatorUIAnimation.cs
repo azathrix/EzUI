@@ -1,3 +1,4 @@
+using System.Threading;
 using Azathrix.EzUI.Core;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -13,7 +14,7 @@ namespace Azathrix.EzUI.Animations
         [SerializeField] private string _showStateName = "show";
         [SerializeField] private string _hideStateName = "hide";
 
-        public override async UniTask PlayShowAsync(Panel panel)
+        public override async UniTask PlayShowAsync(Panel panel, CancellationToken cancellationToken)
         {
             var target = ResolvePanel(panel);
             if (target == null) return;
@@ -22,12 +23,12 @@ namespace Azathrix.EzUI.Animations
             if (animator == null) return;
 
             animator.Play(_showStateName);
-            await UniTask.Yield();
+            await UniTask.Yield(cancellationToken);
             var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-            await UniTask.WaitForSeconds(stateInfo.length, true);
+            await UniTask.WaitForSeconds(stateInfo.length, true, cancellationToken: cancellationToken);
         }
 
-        public override async UniTask PlayHideAsync(Panel panel)
+        public override async UniTask PlayHideAsync(Panel panel, CancellationToken cancellationToken)
         {
             var target = ResolvePanel(panel);
             if (target == null) return;
@@ -36,9 +37,9 @@ namespace Azathrix.EzUI.Animations
             if (animator == null) return;
 
             animator.Play(_hideStateName);
-            await UniTask.Yield();
+            await UniTask.Yield(cancellationToken);
             var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-            await UniTask.WaitForSeconds(stateInfo.length, true);
+            await UniTask.WaitForSeconds(stateInfo.length, true, cancellationToken: cancellationToken);
         }
     }
 }

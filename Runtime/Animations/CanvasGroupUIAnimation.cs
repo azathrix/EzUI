@@ -1,3 +1,4 @@
+using System.Threading;
 using Azathrix.EzUI.Core;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace Azathrix.EzUI.Animations
         [SerializeField] private float _showFrom = 0f;
         [SerializeField] private float _hideTo = 0f;
 
-        public override async UniTask PlayShowAsync(Panel panel)
+        public override async UniTask PlayShowAsync(Panel panel, CancellationToken cancellationToken)
         {
             var target = ResolvePanel(panel);
             if (target == null) return;
@@ -29,13 +30,13 @@ namespace Azathrix.EzUI.Animations
             {
                 elapsed += Time.unscaledDeltaTime;
                 group.alpha = Mathf.Clamp01(elapsed / duration);
-                await UniTask.Yield();
+                await UniTask.Yield(cancellationToken);
             }
 
             group.alpha = 1f;
         }
 
-        public override async UniTask PlayHideAsync(Panel panel)
+        public override async UniTask PlayHideAsync(Panel panel, CancellationToken cancellationToken)
         {
             var target = ResolvePanel(panel);
             if (target == null) return;
@@ -49,7 +50,7 @@ namespace Azathrix.EzUI.Animations
             {
                 elapsed += Time.unscaledDeltaTime;
                 group.alpha = Mathf.Lerp(1f, _hideTo, Mathf.Clamp01(elapsed / duration));
-                await UniTask.Yield();
+                await UniTask.Yield(cancellationToken);
             }
 
             group.alpha = _hideTo;

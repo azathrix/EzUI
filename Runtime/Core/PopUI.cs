@@ -61,9 +61,9 @@ namespace Azathrix.EzUI.Core
         }
 
         /// <summary>
-        /// 自动关闭时调用（重载以处理不同关闭原因）
+        /// 获取自动关闭行为（重载以处理不同关闭原因）
         /// </summary>
-        public override void OnAutoClose(AutoCloseReason reason, bool useAnimation = true)
+        public override AutoCloseBehavior GetAutoCloseType(AutoCloseReason reason)
         {
             switch (reason)
             {
@@ -71,47 +71,40 @@ namespace Azathrix.EzUI.Core
                     switch (maskClickOperation)
                     {
                         case MaskClickOperationType.None:
-                            break;
+                            return AutoCloseBehavior.None;
                         case MaskClickOperationType.Hide:
-                            Hide(true);
-                            break;
-                        case MaskClickOperationType.Close:
-                            Close(true);
-                            break;
-                        case MaskClickOperationType.DirectClose:
-                            Close(false);
-                            break;
                         case MaskClickOperationType.DirectHide:
-                            Hide(false);
-                            break;
+                            return AutoCloseBehavior.Hide;
+                        case MaskClickOperationType.Close:
+                        case MaskClickOperationType.DirectClose:
+                            return AutoCloseBehavior.Close;
                     }
-                    break;
+                    return AutoCloseBehavior.None;
 
                 case AutoCloseReason.PopAutoClose:
                     switch (autoCloseTopType)
                     {
                         case AutoCloseTopTypeEnum.None:
                         case AutoCloseTopTypeEnum.Ignore:
-                            break;
+                            return AutoCloseBehavior.None;
                         case AutoCloseTopTypeEnum.Hide:
-                            Hide(useAnimation);
-                            break;
+                            return AutoCloseBehavior.Hide;
                         case AutoCloseTopTypeEnum.Close:
-                            Close(useAnimation);
-                            break;
+                            return AutoCloseBehavior.Close;
                     }
-                    break;
+                    return AutoCloseBehavior.None;
 
                 default:
                     // MainUISwitch, DestroyAll 等使用基类默认行为
-                    base.OnAutoClose(reason, useAnimation);
-                    break;
+                    return base.GetAutoCloseType(reason);
             }
         }
 
         public virtual void OnMaskClick()
         {
-            OnAutoClose(AutoCloseReason.MaskClick);
+            var useAnimation = maskClickOperation != MaskClickOperationType.DirectHide &&
+                               maskClickOperation != MaskClickOperationType.DirectClose;
+            UISystem?.AutoClose(this, AutoCloseReason.MaskClick, useAnimation);
         }
     }
 }

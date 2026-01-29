@@ -37,5 +37,9 @@ namespace Azathrix.EzUI.Core
         public virtual void OnClose()
         {
         }
+
+        public virtual void OnClosed()
+        {
+        }
     }
 }

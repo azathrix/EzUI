@@ -73,12 +73,6 @@ namespace Azathrix.EzUI.Events
         public Panel target;
     }
 
-    public struct UIMainUIChanged
-    {
-        public Panel previous;
-        public Panel current;
-    }
-
     public struct UIInputSchemeChanged
     {
         public string previous;

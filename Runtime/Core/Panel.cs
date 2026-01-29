@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Azathrix.EzUI.Animations;
 using Azathrix.EzUI.Events;
 using Azathrix.Framework.Core;
@@ -15,6 +16,13 @@ using Sirenix.OdinInspector;
 
 namespace Azathrix.EzUI.Core
 {
+    public enum AutoCloseBehavior
+    {
+        None,
+        Hide,
+        Close
+    }
+
     public class Panel : GameScript
     {
         /// <summary>
@@ -83,29 +91,22 @@ namespace Azathrix.EzUI.Core
         public virtual bool blockInputDuringAnimation => EzUISettings.Instance?.blockInputDuringAnimation ?? true;
 
         /// <summary>
-        /// 自动关闭时调用（可重载以自定义行为）
+        /// 获取自动关闭行为（可重载以自定义行为）
         /// </summary>
         /// <param name="reason">关闭原因</param>
-        /// <param name="useAnimation">是否使用动画</param>
-        public virtual void OnAutoClose(AutoCloseReason reason, bool useAnimation = true)
+        public virtual AutoCloseBehavior GetAutoCloseType(AutoCloseReason reason)
         {
-            // 默认使用 mainUIChangeBehavior 的行为
-            switch (mainUIChangeBehavior)
+            return mainUIChangeBehavior switch
             {
-                case MainUIChangeBehavior.None:
-                    break;
-                case MainUIChangeBehavior.Hide:
-                    if (IsState(StateEnum.Shown))
-                        Hide(useAnimation);
-                    break;
-                case MainUIChangeBehavior.Close:
-                    if (!IsState(StateEnum.Closed))
-                        Close(useAnimation);
-                    break;
-            }
+                MainUIChangeBehavior.Hide => AutoCloseBehavior.Hide,
+                MainUIChangeBehavior.Close => AutoCloseBehavior.Close,
+                _ => AutoCloseBehavior.None
+            };
         }
 
         private readonly List<View> _views = new List<View>();
+        private bool _initialized;
+        private CancellationTokenSource _animationCts;
 
         public void Initialize(string panelPath)
         {
@@ -129,6 +130,8 @@ namespace Azathrix.EzUI.Core
             {
                 Debug.LogException(e);
             }
+
+            _initialized = true;
         }
 
         private StateEnum _state = StateEnum.Hidden;
@@ -171,6 +174,18 @@ namespace Azathrix.EzUI.Core
         /// </summary>
         private bool _isHiding;
 
+        internal bool IsShowingInternal
+        {
+            get => _isShowing;
+            set => _isShowing = value;
+        }
+
+        internal bool IsHidingInternal
+        {
+            get => _isHiding;
+            set => _isHiding = value;
+        }
+
         protected void SetState(StateEnum state)
         {
             if (_state == state)
@@ -180,6 +195,11 @@ namespace Azathrix.EzUI.Core
             _state = state;
             OnStateChanged(last, state);
             UISystem?.NotifyPanelStateChanged(this, last, state);
+        }
+
+        internal void SetStateInternal(StateEnum state)
+        {
+            SetState(state);
         }
 
         public bool IsState(StateEnum state)
@@ -218,15 +238,6 @@ namespace Azathrix.EzUI.Core
                 }
                     break;
                 case StateEnum.Closed:
-                    try
-                    {
-                        OnClose();
-                        foreach (var view in _views) view.OnClose();
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogException(e);
-                    }
                     break;
             }
         }
@@ -235,36 +246,112 @@ namespace Azathrix.EzUI.Core
         {
         }
 
-        public virtual void Hide(bool useAnimation = true)
+        protected virtual void OnClosed()
         {
-            if (!IsState(StateEnum.Shown))
-                return;
-            HideAsync(useAnimation).Forget();
         }
 
-        public virtual async UniTask HideAsync(bool useAnimation = true)
+        internal void InvokeOnClose()
         {
-            if (!IsState(StateEnum.Shown))
-                return;
-
-            _isHiding = true;
-
-            if (!useAnimation)
+            try
             {
-                gameObject.SetActive(false);
-                SetState(StateEnum.Hidden);
-                UISystem?.RefreshUI();
-                _isHiding = false;
-                return;
+                OnClose();
+                foreach (var view in _views)
+                    view.OnClose();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        internal void InvokeOnClosed()
+        {
+            try
+            {
+                OnClosed();
+                foreach (var view in _views)
+                    view.OnClosed();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        internal void CancelAnimation()
+        {
+            if (_animationCts != null)
+            {
+                _animationCts.Cancel();
+                _animationCts.Dispose();
+                _animationCts = null;
             }
 
-            UISystem?.RefreshUI();
-
-            await HideAnimationAsync();
-            gameObject.SetActive(false);
-
-            SetState(StateEnum.Hidden);
+            isAnimationPlaying = false;
+            _isShowing = false;
             _isHiding = false;
+        }
+
+        internal CancellationToken StartAnimationToken()
+        {
+            CancelAnimation();
+            _animationCts = new CancellationTokenSource();
+            return _animationCts.Token;
+        }
+
+        private string ResolveSystemPath()
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+                return path;
+            return UISystem != null ? UISystem.GetPath(GetType()) : null;
+        }
+
+        public void Show(bool useAnimation = true)
+        {
+            var p = ResolveSystemPath();
+            if (UISystem == null || string.IsNullOrWhiteSpace(p))
+                return;
+            UISystem.Show(p, useAnimation, userData);
+        }
+
+        public async UniTask<Panel> ShowAsync(bool useAnimation = true)
+        {
+            var p = ResolveSystemPath();
+            if (UISystem == null || string.IsNullOrWhiteSpace(p))
+                return null;
+            return await UISystem.ShowAsync(p, useAnimation, userData);
+        }
+
+        public void Hide(bool useAnimation = true)
+        {
+            var p = ResolveSystemPath();
+            if (UISystem == null || string.IsNullOrWhiteSpace(p))
+                return;
+            UISystem.Hide(p, useAnimation);
+        }
+
+        public async UniTask HideAsync(bool useAnimation = true)
+        {
+            var p = ResolveSystemPath();
+            if (UISystem == null || string.IsNullOrWhiteSpace(p))
+                return;
+            await UISystem.HideAsync(p, useAnimation);
+        }
+
+        public void Close(bool useAnimation = true)
+        {
+            var p = ResolveSystemPath();
+            if (UISystem == null || string.IsNullOrWhiteSpace(p))
+                return;
+            UISystem.Close(p, useAnimation);
+        }
+
+        public async UniTask CloseAsync(bool useAnimation = true)
+        {
+            var p = ResolveSystemPath();
+            if (UISystem == null || string.IsNullOrWhiteSpace(p))
+                return;
+            await UISystem.CloseAsync(p, useAnimation);
         }
 
         public async UniTask WaitEnd()
@@ -278,75 +365,7 @@ namespace Azathrix.EzUI.Core
             }
         }
 
-        public virtual void Show(bool useAnimation = true)
-        {
-            if (!IsState(StateEnum.Hidden))
-                return;
-            ShowAsync(useAnimation).Forget();
-        }
-
-        public virtual async UniTask ShowAsync(bool useAnimation = true)
-        {
-            if (!IsState(StateEnum.Hidden))
-                return;
-
-            _isShowing = true;
-
-            if (!useAnimation)
-            {
-                gameObject.SetActive(true);
-                SetState(StateEnum.Shown);
-                UISystem?.RefreshUI();
-                _isShowing = false;
-                return;
-            }
-
-            gameObject.SetActive(true);
-
-            UISystem?.RefreshUI();
-
-            await ShowAnimationAsync();
-
-            SetState(StateEnum.Shown);
-            _isShowing = false;
-        }
-
-        public virtual void Close(bool useAnimation = true)
-        {
-            CloseAsync(useAnimation).Forget();
-        }
-
-        public virtual async UniTask CloseAsync(bool useAnimation = true)
-        {
-            if (IsState(StateEnum.Closed))
-                return;
-
-            _isHiding = true;
-
-            if (!useAnimation)
-            {
-                gameObject.SetActive(false);
-                SetState(StateEnum.Hidden);
-                SetState(StateEnum.Closed);
-                UISystem?.RefreshUI();
-                UISystem?.Destroy(this);
-                _isHiding = false;
-                return;
-            }
-
-            UISystem?.RefreshUI();
-
-            await HideAnimationAsync();
-            gameObject.SetActive(false);
-
-            SetState(StateEnum.Hidden);
-            SetState(StateEnum.Closed);
-
-            _isHiding = false;
-            UISystem?.Destroy(this);
-        }
-
-        protected virtual async UniTask HideAnimationAsync()
+        protected virtual async UniTask HideAnimationAsync(CancellationToken cancellationToken)
         {
             EnsureAnimationComponent();
             if (_animation == null)
@@ -357,7 +376,7 @@ namespace Azathrix.EzUI.Core
 
             try
             {
-                await _animation.PlayHideAsync(this);
+                await _animation.PlayHideAsync(this, cancellationToken);
             }
             catch (Exception e)
             {
@@ -368,7 +387,7 @@ namespace Azathrix.EzUI.Core
             DispatchAnimationStateChanged(false);
         }
 
-        protected virtual async UniTask ShowAnimationAsync()
+        protected virtual async UniTask ShowAnimationAsync(CancellationToken cancellationToken)
         {
             EnsureAnimationComponent();
             if (_animation == null)
@@ -379,7 +398,7 @@ namespace Azathrix.EzUI.Core
 
             try
             {
-                await _animation.PlayShowAsync(this);
+                await _animation.PlayShowAsync(this, cancellationToken);
             }
             catch (Exception e)
             {
@@ -388,6 +407,16 @@ namespace Azathrix.EzUI.Core
 
             isAnimationPlaying = false;
             DispatchAnimationStateChanged(false);
+        }
+
+        internal UniTask RunHideAnimationAsync(CancellationToken cancellationToken)
+        {
+            return HideAnimationAsync(cancellationToken);
+        }
+
+        internal UniTask RunShowAnimationAsync(CancellationToken cancellationToken)
+        {
+            return ShowAnimationAsync(cancellationToken);
         }
 
         private void DispatchAnimationStateChanged(bool isPlaying)
@@ -406,6 +435,44 @@ namespace Azathrix.EzUI.Core
             if (group == null)
                 group = gameObject.AddComponent<CanvasGroup>();
             return group;
+        }
+
+        internal void InvokeOnShow()
+        {
+            try
+            {
+                AzathrixFramework.Dispatcher.Dispatch(new UIPanelShow
+                {
+                    panel = this,
+                    path = path
+                });
+                OnShow();
+                foreach (var view in _views)
+                    view.OnShow();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        internal void InvokeOnHide()
+        {
+            try
+            {
+                AzathrixFramework.Dispatcher.Dispatch(new UIPanelHide
+                {
+                    panel = this,
+                    path = path
+                });
+                OnHide();
+                foreach (var view in _views)
+                    view.OnHide();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         protected virtual void OnHide()
@@ -430,7 +497,28 @@ namespace Azathrix.EzUI.Core
 
         public void RegisterView(View view)
         {
+            if (view == null || _views.Contains(view))
+                return;
             _views.Add(view);
+            if (!_initialized)
+                return;
+
+            try
+            {
+                view.OnCreate();
+                if (_isShowing && IsState(StateEnum.Hidden))
+                    return;
+                if (IsVisible)
+                    view.OnShow();
+                if (IsState(StateEnum.Shown))
+                    view.OnShown();
+                else if (!IsVisible && IsState(StateEnum.Hidden))
+                    view.OnHidden();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         private void EnsureAnimationComponent()
